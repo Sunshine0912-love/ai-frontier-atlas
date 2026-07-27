@@ -1,7 +1,7 @@
 ---
 import Layout from '../../components/Layout.astro';
 import tracks from '../../data/tracks.json';
-import lessons from '../../data/lessons.json';
+import syllabus from '../../data/syllabus.json';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const stages = [...new Set(tracks.map(track => track.stage))];
 const trackById = Object.fromEntries(tracks.map(track => [track.id, track]));
@@ -30,14 +30,15 @@ const trackById = Object.fromEntries(tracks.map(track => [track.id, track]));
         </header>
         <div class="stage-tracks">
           {tracks.filter(track => track.stage === stage).map(track => {
-            const trackLessons = lessons.filter(lesson => lesson.track === track.id).sort((a, b) => a.order - b.order);
+            const trackLessons = syllabus.filter(item => item.track === track.id).sort((a, b) => a.order - b.order);
+            const availableCount = trackLessons.filter(item => item.status === 'available').length;
             return (
               <article class={`track-module module-${track.color}`} id={track.id}>
                 <div class="module-head">
                   <div><span>{track.number}</span><p>{track.status === 'available' ? 'AVAILABLE' : 'EXPANDING'}</p></div>
                   <div><h3>{track.title}</h3><p>{track.description}</p></div>
                   <dl>
-                    <div><dt>课程</dt><dd>{trackLessons.length}/{track.plannedLessons}</dd></div>
+                    <div><dt>已发布</dt><dd>{availableCount}/{track.plannedLessons}</dd></div>
                     <div><dt>实验</dt><dd>{track.labCount}</dd></div>
                   </dl>
                 </div>
@@ -46,12 +47,18 @@ const trackById = Object.fromEntries(tracks.map(track => [track.id, track]));
                   <div><strong>能力目标</strong><ul>{track.outcomes.map(outcome => <li>{outcome}</li>)}</ul></div>
                 </div>
                 <div class="module-lessons">
-                  {trackLessons.map(lesson => (
-                    <a href={`${base}/learn/${lesson.slug}/`}>
-                      <span>L{String(lesson.order).padStart(2, '0')}</span>
-                      <div><strong>{lesson.title}</strong><p>{lesson.description}</p></div>
-                      <em>{lesson.duration}</em><i>→</i>
+                  {trackLessons.map(item => item.status === 'available' ? (
+                    <a class="available" href={`${base}/learn/${item.slug}/`}>
+                      <span>L{String(item.order).padStart(2, '0')}</span>
+                      <div><strong>{item.title}</strong><p>{item.focus}</p></div>
+                      <em>完整文章</em><i>→</i>
                     </a>
+                  ) : (
+                    <div class="planned">
+                      <span>L{String(item.order).padStart(2, '0')}</span>
+                      <div><strong>{item.title}</strong><p>{item.focus}</p></div>
+                      <em>待连载</em><i>·</i>
+                    </div>
                   ))}
                 </div>
               </article>

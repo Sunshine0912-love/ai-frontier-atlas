@@ -1,0 +1,416 @@
+[
+  {
+    "slug": "moe-from-routing-to-all-to-all",
+    "chapters": [
+      {
+        "id": "problem",
+        "title": "问题设定：参数容量为什么不必等于每 token 计算量",
+        "paragraphs": [
+          "标准 Transformer 的前馈网络会让每个 token 经过同一组参数。扩大 FFN 宽度可以增加模型容量，但参数量、激活显存和每 token FLOPs 会同步增长。Mixture-of-Experts 的目标是拆开这三个量：模型可以拥有很多专家参数，却只为一个 token 激活其中少数几个。讨论 MoE 时必须始终区分“总参数”“激活参数”和“实际墙钟时间”，否则很容易把理论稀疏性误当成系统加速。",
+          "设一批序列展开后共有 T 个 token，隐藏维度为 d，专家数为 E，每个 token 选择 k 个专家。Router 为每个 token 产生 E 个分数，top-k 决定激活专家和聚合权重。理想计算量约等于 k 个 FFN，而不是 E 个 FFN；但 token 必须按照专家重新分组，并在专家并行设备之间搬运。由此，MoE 把一部分矩阵计算问题转化成了路由、容量管理和网络通信问题。[1]"
+        ]
+      },
+      {
+        "id": "baseline",
+        "title": "基线：Dense FFN 的简单性与上限",
+        "paragraphs": [
+          "Dense FFN 通常由上投影、非线性或门控激活、下投影组成。所有 token 执行相同的矩阵乘法，因此 GPU 容易形成规则的大 GEMM，负载天然均匀，也不需要 token 重排和跨卡 All-to-All。它的性能模型相对直接：给定 batch、序列长度和隐藏维度，可以从 FLOPs、显存带宽及张量并行通信估算吞吐。",
+          "Dense 的代价是计算随参数规模线性增长。当希望继续增加知识容量或条件计算能力时，所有 token 都为新增参数付费。MoE 用 E 套 FFN 替换一套 FFN，再通过 top-k 稀疏激活降低单 token 成本。收益不是“免费增加参数”：router、本地打包、两次 All-to-All、容量冗余和负载尾部都会消耗时间，训练阶段还要处理专家塌缩与梯度不均。"
+        ]
+      },
+      {
+        "id": "routing",
+        "title": "核心机制：路由、容量与负载均衡",
+        "paragraphs": [
+          "Router 通常是隐藏状态到 E 维 logits 的线性映射。对每个 token 取 top-k 后，只保留被选专家的权重并重新归一化。随后系统统计每个专家接收的 token 数，建立 prefix sum 和置换索引，把原本按序列排列的 token 打包成按专家连续的 buffer。专家完成 FFN 后，再用逆置换恢复 token 顺序，并按照 router 权重对多个专家输出求和。",
+          "真正困难的是路由分布不会自动均匀。若少数专家长期热门，它们决定整个同步步骤的尾延迟；若实现设置固定容量 C，超出容量的 token 可能被丢弃、绕行或延迟。辅助负载损失通常同时观察路由概率质量和实际 token 占比，鼓励专家利用率均衡。它是系统目标与建模目标之间的妥协：过弱会拥塞，过强则可能迫使 token 选择语义上并不合适的专家。"
+        ]
+      },
+      {
+        "id": "dispatch",
+        "title": "数据路径：Dispatch、All-to-All 与 Combine",
+        "paragraphs": [
+          "在专家并行中，每张卡只保存一部分专家。第一次 All-to-All 将本卡输入 token 发送到专家所在卡；本地专家完成计算后，第二次 All-to-All 将结果送回 token 原属卡。一次 MoE 层因此包含 router、计数与排序、dispatch 通信、expert GEMM、返回通信和 combine。只测 expert GEMM 会严重高估加速，因为通信等待和最慢专家常在端到端时间中占主导。",
+          "分析通信时需要记录每个 rank 的发送矩阵、消息大小分布、链路带宽与同步方式，而不是只看平均字节数。总字节量近似与 T·k·d·bytes 成正比，但墙钟时间还受小消息效率、拓扑、跨节点比例和负载偏斜影响。较好的实现会把通信与专家计算重叠，或把 token 分组限制在高速互联域内；前提是本地已有足够工作，并且调度不会引入新的串行依赖。[2]"
+        ]
+      },
+      {
+        "id": "example",
+        "title": "最小例子：8 个 token、4 个专家、top-2",
+        "paragraphs": [
+          "考虑 T=8、E=4、k=2。Router 输出形状为 [8,4]，top-2 索引和权重形状均为 [8,2]，因此产生 16 个 token-expert assignment。若四个专家接收量为 [7,4,3,2]，平均容量是 4，但专家 0 已形成明显热点。容量因子为 1.25 时每个专家容量 C=ceil(8×2/4×1.25)=5，专家 0 的两个 assignment 需要丢弃、重路由或进入额外缓冲。",
+          "若专家 0 和 1 位于 GPU0、专家 2 和 3 位于 GPU1，dispatch metadata 要记录源 token、目标专家、目标 rank 与 combine 权重。打包后形成按目标 rank 连续的发送区。返回时，两个专家输出按原 token 聚合成 [8,d]。这个玩具例子揭示三个独立指标：路由质量看专家是否合适，容量安全看是否溢出，系统效率看两个 rank 是否能同时完成而不互相等待。"
+        ]
+      },
+      {
+        "id": "implementation",
+        "title": "源码阅读与性能定位",
+        "paragraphs": [
+          "阅读实现时先找模型配置中的 num_experts、top_k、capacity_factor 和 expert_parallel_size，再定位 router 的 logits、topk、aux loss。接着沿 token counts、permutation、dispatch buffer 和 process group 找到通信调用。每个关键张量都应写下形状和所属设备；尤其要分清逻辑专家编号、rank 内本地专家编号，以及恢复顺序所需的 metadata。",
+          "性能分析至少要有 router、packing、A2A wait、expert GEMM、return A2A 和 combine 六段时间，并同时保存每专家 token 数的 P50/P95/max。若 GEMM 利用率低，原因可能是每专家 batch 太小；若 A2A 占比高，要进一步区分网络带宽不足与负载尾部造成的等待。优化必须在相同质量、容量策略和全局 batch 下比较，否则吞吐提升可能只是来自更多丢 token。"
+        ]
+      },
+      {
+        "id": "boundaries",
+        "title": "适用边界：什么时候 MoE 不会更快",
+        "paragraphs": [
+          "小 batch、短序列或专家数过多时，每个专家得到的 token 很少，GEMM 变碎，kernel launch 与通信固定成本难以摊薄。跨节点带宽弱时，理论 FLOPs 节省也可能完全被 All-to-All 吞噬。推理场景还会遇到请求动态性：同一批 token 的路由分布随输入变化，容量规划和尾延迟比训练时更难稳定。",
+          "因此采用 MoE 的判断应基于完整目标函数：在质量相当时比较每 token 成本、吞吐、P95 延迟、峰值显存、互联占用和运维复杂度。若工作负载无法形成足够大的专家 batch，或拓扑不支持高效 A2A，Dense 模型可能更稳定。MoE 的核心价值是条件计算带来的容量扩展，不是对任何硬件和负载都成立的通用加速器。"
+        ]
+      }
+    ],
+    "formulas": [
+      {"afterChapter":"routing","label":"Top-k 专家聚合","latex":"y_t=\\sum_{e\\in\\operatorname{TopK}(g(x_t))}p_{t,e}\\,f_e(x_t)","symbols":["x_t：第 t 个 token 的隐藏状态","g：router","p_{t,e}：归一化路由权重","f_e：第 e 个专家 FFN"],"intuition":"所有专家参数都存在，但一次前向只执行 top-k 专家；稀疏性减少计算，却没有消除选择和搬运 token 的成本。"},
+      {"afterChapter":"example","label":"每专家容量","latex":"C=\\left\\lceil\\frac{T\\cdot k}{E}\\cdot\\alpha\\right\\rceil","symbols":["T：本次路由的 token 数","k：每 token 激活专家数","E：专家总数","\\alpha：容量因子"],"intuition":"平均负载乘以容量冗余得到可容纳 assignment 数；提高容量可减少丢弃，但会增加缓冲区和空算。"}
+    ],
+    "workedExample":{"title":"从路由输出手算一次 dispatch","steps":["构造 [8,4] router logits，手算每行 top-2 索引和 softmax 后权重。","统计 16 个 assignment 的专家直方图，计算不同容量因子下的溢出数。","为两张 GPU 生成 send counts、置换索引与返回后的 combine 结果。"],"result":"最终输出保持 [8,d]，但中间通信量、专家 batch 大小和等待时间由路由分布决定。"},
+    "implementationMap":[{"concept":"路由","code":"router → softmax/topk","note":"记录 logits、索引、权重和熵。"},{"concept":"分发","code":"token counts → permutation → all_to_all","note":"检查 rank 发送矩阵和容量裁剪。"},{"concept":"专家计算","code":"grouped GEMM / expert MLP","note":"关注每专家 batch 与 GEMM 利用率。"},{"concept":"聚合","code":"inverse permutation → weighted sum","note":"验证 token 顺序和 top-k 权重。"}],
+    "limitations":["负载均衡目标可能与语义专门化冲突。","稀疏 FLOPs 不保证端到端墙钟时间降低。","跨节点 All-to-All 对拓扑和网络拥塞高度敏感。","推理负载动态时容量与尾延迟更难预测。"],
+    "takeaways":["始终区分总参数、激活参数与墙钟成本。","以 token 的完整数据路径分析 MoE，而不是只看专家 GEMM。","同时监控质量、容量溢出和专家负载尾部。","只有在真实拓扑和工作负载上测量，才能判断 MoE 是否值得。"]
+  },
+  {
+    "slug": "clip-contrastive-multimodal-learning",
+    "chapters": [
+      {
+        "id": "problem",
+        "title": "问题设定：如何把图像与语言放进同一坐标系",
+        "paragraphs": [
+          "传统视觉分类器依赖固定类别和人工标签，输出层只能回答训练时定义的问题。CLIP 希望利用互联网上天然共现的图像—文本对学习通用视觉表示：图像编码器和文本编码器分别输出向量，真实配对在共享空间中接近，错误配对远离。这样，同一个图像向量既能用于检索，也能与任意自然语言类别描述比较。[1]",
+          "关键不是生成文本，而是学习相似度函数。给定 N 对图文，模型一次得到 N 个图像向量和 N 个文本向量，并构造 N×N 相似度矩阵。对角线是已知正样本，其余项被当作 batch 内负样本。这一设计把监督信号从固定类别 id 变成开放词汇文本，但也把 batch 组成、温度与负样本质量带进了训练目标。"
+        ]
+      },
+      {
+        "id": "baseline",
+        "title": "基线：监督分类与交叉编码器",
+        "paragraphs": [
+          "监督分类把图像映射到固定维度 logits，类别语义只存在于标签索引中。它在封闭类别上高效，但增加新类别通常需要重新训练输出头，且大规模人工标注昂贵。CLIP 把类别名称和描述交给文本编码器，因此分类器权重可以在推理时由语言生成，实现开放词汇迁移。",
+          "另一种基线是交叉编码器：让图像 patch 与文本 token 在同一网络中深度交互。它适合细粒度匹配，但每个图文候选对都要重新计算，无法高效缓存海量向量。CLIP 的双塔结构牺牲 token 级交互，换来图像和文本可独立编码、离线缓存并接入近似最近邻索引。选择架构前要先判断任务更需要检索规模还是跨模态细节。"
+        ]
+      },
+      {
+        "id": "objective",
+        "title": "核心目标：归一化、温度与对称交叉熵",
+        "paragraphs": [
+          "图像特征 I 和文本特征 T 先经过投影并做 L2 归一化，所以点积等于余弦相似度。logit scale 的倒数可理解为温度 τ：温度越小，相似度分布越尖锐，模型更强烈地惩罚难负样本；温度过小会造成梯度集中和训练不稳定，过大则难以拉开正负间隔。官方实现把 logit_scale 作为可学习参数并取指数确保为正。[2]",
+          "损失同时计算 image→text 与 text→image 两个方向。前者要求每张图在 N 个文本中找到配对文本，后者要求每段文本在 N 张图中找到配对图像。两项看似对称，却约束了两个检索方向的排名；只训练一个方向可能使另一模态的局部密度和检索质量失衡。分布式训练还需 all-gather 其他设备特征，扩大负样本池。"
+        ]
+      },
+      {
+        "id": "example",
+        "title": "最小例子：3 对图文的相似度矩阵",
+        "paragraphs": [
+          "假设 batch 包含“狗在草地”“红色汽车”“一碗拉面”三对样本，归一化后得到 3×3 相似度矩阵。理想情况下，对角线大于同行和同列其他元素。image→text 交叉熵以标签 [0,1,2] 监督每一行；text→image 对转置矩阵使用同样标签。平均两项后，每个正对既要战胜同图的错误文本，也要战胜同文本的错误图像。",
+          "若“狗在草地”与“动物在户外”也出现在 batch 中，它被当作负样本，但语义可能高度相关。这叫 false negative：目标会迫使本应接近的表示分开。增加 batch 虽带来更多负样本，也会增加这类冲突。实际诊断应查看最相似错误对，而不是只看平均 loss；它能暴露重复描述、标签粒度和数据清洗问题。"
+        ]
+      },
+      {
+        "id": "zero-shot",
+        "title": "零样本分类：文本原型就是动态分类器",
+        "paragraphs": [
+          "零样本分类先把每个类别写成提示，如“a photo of a {class}”，编码并归一化得到类别原型。图像向量与所有原型点积，经过 softmax 得到类别概率。它并非无监督：模型已经从大规模图文配对获得监督，只是在目标数据集上没有用类别标签更新参数。类别名称、提示语言和模板会直接定义决策边界。",
+          "Prompt ensemble 用多种模板编码同一类别，并在归一化后平均原型，减少单一措辞造成的偏差。但模板优化也可能变成隐性调参；严谨报告必须公开模板、类别映射和是否使用验证集。对于细粒度物种、数字、空间关系或需要局部证据的任务，双塔全局向量可能不足，零样本分数不能代表一般视觉理解。"
+        ]
+      },
+      {
+        "id": "implementation",
+        "title": "实现路径：从编码器到大规模检索",
+        "paragraphs": [
+          "源码阅读应从 encode_image、encode_text、projection、normalize 和 logit_scale 开始，验证输出形状都是 [N,d]。训练时检查分布式 all-gather 是否保留梯度、全局 batch 中正样本索引是否正确，以及图文增强是否破坏配对语义。若不同设备的样本顺序或标签 offset 错位，模型会在看似正常的 loss 下学习错误对应。",
+          "服务检索时，图像或文本库向量可离线计算并写入 ANN 索引，查询只需编码另一模态并执行最近邻搜索。工程评测除 Recall@K 外，还要记录编码吞吐、索引内存、更新延迟和相似度校准。向量版本必须绑定模型权重与预处理配置；更换 resize、tokenizer 或投影头后，旧索引不再兼容。"
+        ]
+      },
+      {
+        "id": "boundaries",
+        "title": "失败边界：捷径、偏差与语义粒度",
+        "paragraphs": [
+          "CLIP 会学习训练数据中的可预测线索，不保证使用人类期望的视觉证据。背景、文字水印、拍摄风格和来源站点都可能成为捷径。公开网络图文还包含文化与职业偏差，零样本分类器把这些偏差直接带入类别相似度。高平均准确率不能替代按地域、属性和场景切片的审计。",
+          "在生产中应把 CLIP 视为强大的表示与候选召回器，而不是事实验证器。对高风险决策需要任务数据上的校准、拒绝机制和人工复核；对细粒度理解可增加区域级交互或交叉编码重排。最重要的实验不是再报一个总分，而是改变模板、背景和同义描述，观察模型预测是否基于稳定语义。"
+        ]
+      }
+    ],
+    "formulas": [
+      {"afterChapter":"objective","label":"图文相似度矩阵","latex":"S_{ij}=\\frac{\\langle \\hat{I}_i,\\hat{T}_j\\rangle}{\\tau}","symbols":["\\hat{I}_i：归一化图像向量","\\hat{T}_j：归一化文本向量","\\tau：温度"],"intuition":"归一化消除向量模长影响，温度控制 softmax 的尖锐程度；矩阵一行对应图到文检索，一列对应文到图检索。"},
+      {"afterChapter":"objective","label":"对称对比损失","latex":"\\mathcal{L}=\\frac{1}{2N}\\sum_i\\left[\\operatorname{CE}(S_{i,:},i)+\\operatorname{CE}(S_{:,i},i)\\right]","symbols":["N：batch 中配对数量","S_{i,:}：第 i 张图对所有文本的 logits","S_{:,i}：第 i 段文本对所有图像的 logits"],"intuition":"同一对样本同时受到两个检索方向约束，使图像空间和文本空间的局部排名都可用。"}
+    ],
+    "workedExample":{"title":"手算三对样本的对比损失","steps":["构造三组二维单位向量并计算 3×3 点积矩阵。","选择两个温度值，比较每行 softmax 和正样本损失。","转置矩阵计算第二个方向，定位一个 false negative 对梯度的影响。"],"result":"温度改变难负样本权重，对称项确保两个检索方向都获得直接监督。"},
+    "implementationMap":[{"concept":"双塔编码","code":"encode_image / encode_text","note":"核对预处理、tokenizer 和 [N,d] 输出。"},{"concept":"对比目标","code":"normalize → matmul → logit_scale","note":"检查全局 batch 标签与梯度 all-gather。"},{"concept":"零样本分类","code":"prompt templates → class prototypes","note":"公开模板并对类别原型归一化。"},{"concept":"大规模检索","code":"offline embeddings → ANN index","note":"绑定向量、模型和预处理版本。"}],
+    "limitations":["Batch 内负样本可能包含语义相近的 false negative。","全局双塔向量缺少细粒度 token/patch 交互。","零样本结果对类别措辞与模板敏感。","网络图文数据会传递社会偏差和视觉捷径。"],
+    "takeaways":["CLIP 学的是跨模态相似度，不是图像描述生成。","N×N 相似度矩阵同时提供正对和 batch 内负样本。","零样本分类器由文本原型动态定义，必须报告模板。","真实应用要用失败切片验证模型是否依赖正确证据。"]
+  },
+  {
+    "slug": "preference-alignment-from-rlhf-to-dpo",
+    "chapters": [
+      {
+        "id": "problem",
+        "title": "问题设定：最大似然为什么不足以表达偏好",
+        "paragraphs": [
+          "监督微调把示范回答当作唯一目标，用 token 级最大似然模仿数据分布。但很多开放式任务不存在唯一正确文本，人们更容易比较两个回答谁更有帮助、安全或符合格式。偏好数据因此写成三元组 (x,y_w,y_l)：同一提示 x 下，标注者选择 y_w 而拒绝 y_l。对齐算法要把相对比较转成策略更新。",
+          "困难在于“人类偏好”不是单一稳定函数。标注指南、呈现顺序、回答长度、语言风格和标注者背景都会影响选择。算法可以更高效地拟合偏好对，却不能自动修复数据偏差。研究一条对齐管线时，应把数据生成、标注协议、训练目标、参考策略和最终多维评测视为一个系统，而不是只比较 loss 公式。"
+        ]
+      },
+      {
+        "id": "rlhf",
+        "title": "经典 RLHF：SFT、奖励模型与策略优化",
+        "paragraphs": [
+          "InstructGPT 管线先用高质量示范训练 SFT 模型，再对同一提示采样多个候选并收集排序。奖励模型接收提示和回答，输出标量分数，通过 Bradley–Terry 概率拟合成对偏好。最后用 PPO 等强化学习算法最大化奖励，同时加入相对 SFT/reference 模型的 KL 惩罚，避免策略为追逐奖励而漂移过远。[1]",
+          "这条管线的优势是可以在线采样并优化不可微奖励，适合环境反馈和多步决策；代价是需要维护策略、参考、奖励与价值网络，rollout 和 PPO 对数值稳定性敏感。奖励模型只是标注偏好的代理，策略若找到奖励漏洞，会提高预测分数而损害真实质量。KL、奖励裁剪和人工评测都是控制这种过优化的手段。"
+        ]
+      },
+      {
+        "id": "dpo",
+        "title": "DPO：把隐式奖励化成二分类目标",
+        "paragraphs": [
+          "DPO 从带 KL 约束的最优策略形式出发，把奖励差写成策略与参考模型 log-ratio 的差。训练时无需显式拟合奖励模型，也无需在环 PPO rollout；只要计算 policy 与 frozen reference 对 chosen/rejected 序列的对数概率，就能构造 logistic loss。chosen 的相对优势增加时，loss 下降。[2]",
+          "“直接”并不等于没有锚点。Reference model 决定了偏离基线的相对尺度，β 控制偏好拟合与保守程度。训练还需要对每个 token 计算 logits，并正确处理 prompt mask、padding、EOS 和长度归一。若 chosen 普遍更长，序列 log-prob 与内容偏好可能纠缠；算法会忠实学习数据中的长度代理。"
+        ]
+      },
+      {
+        "id": "example",
+        "title": "最小例子：一对回答如何产生 DPO 梯度",
+        "paragraphs": [
+          "假设 policy 对 chosen/rejected 的序列 log-prob 分别为 -8 和 -10，reference 分别为 -9 和 -9.5。Policy 偏好差为 2，reference 偏好差为 0.5，净优势为 1.5。β=0.1 时 preference logit 为 0.15，loss 为 -log σ(0.15)。若训练把 chosen log-prob 提高 0.5，净优势和 logit 都变大，loss 随之降低。",
+          "若 policy 与 reference 都同样偏好 chosen，净优势可能接近零；DPO 更新关注的是相对 reference 的改变，而非绝对概率。β 增大使同样 log-ratio 差产生更尖锐的分类信号，但并不能单独解释实际 KL。调试时应构造固定 logits 单元测试，验证交换 chosen/rejected 会翻转符号，提升 chosen 相对概率必然降低 loss。"
+        ]
+      },
+      {
+        "id": "data",
+        "title": "数据审计：格式、长度与标签噪声",
+        "paragraphs": [
+          "对齐失败经常先发生在数据层。Chosen 与 rejected 必须使用完全一致的 prompt、chat template 和截断规则；若一侧丢失 EOS 或被截得更短，模型可能学习格式差异。应按来源统计长度、语言、拒答率、模板、重复提示和胜负标签一致性，并抽样检查偏好是否真的由目标属性驱动。",
+          "标签噪声不是均匀随机噪声。边界样本、政治文化问题、创造性任务和安全拒答往往分歧更大。可保留多标注者分布、置信度或平局，而非强行压成二元标签。训练/验证划分应按提示或任务簇去重，避免近重复泄漏让 preference accuracy 看起来过高。"
+        ]
+      },
+      {
+        "id": "implementation",
+        "title": "实现与监控：从 token mask 到能力回归",
+        "paragraphs": [
+          "实现顺序应从数据 collator 开始：拼出 prompt+response，建立只在回答 token 上求和的 mask，并确保 chosen/rejected 对齐。Policy 与 reference 前向得到 [B,2,L,V] logits，经 log-softmax 和 gather 获得目标 token log-prob，再按 mask 求和成 [B,2]。Reference 可预计算，但要绑定 tokenizer、模板和模型版本。",
+          "监控不能只看训练 loss。至少同时报告 pairwise accuracy、隐式奖励 margin、policy-reference KL 近似、chosen/rejected 长度切片、基础能力基准、安全切片和真实任务成功率。若偏好胜率上升但数学、事实性或拒答校准退化，应停止训练并回到数据与 β，而不是继续追逐单一指标。"
+        ]
+      },
+      {
+        "id": "boundaries",
+        "title": "算法边界：离线偏好并非万能反馈",
+        "paragraphs": [
+          "DPO 适合高质量静态偏好对和单轮序列比较，但不直接解决需要探索的多步动作、稀疏环境奖励或答案生成后才能验证的任务。离线数据只覆盖行为策略访问过的区域，模型在分布外输出上可能没有可靠偏好信号。此时在线 RL、可验证奖励或迭代数据收集更合适。",
+          "无论 RLHF 还是 DPO，都可能把标注者偏好优化成表面风格：更长、更自信、更多小标题，却不更正确。可靠结论必须来自盲测、人审校准、能力回归和按风险切片的外部评测。对齐的目标不是把模型变得“更讨喜”，而是在明确约束下提高可验证任务质量。"
+        ]
+      }
+    ],
+    "formulas": [
+      {"afterChapter":"rlhf","label":"带 KL 约束的策略目标","latex":"\\max_{\\pi}\\;\\mathbb{E}_{y\\sim\\pi(\\cdot|x)}[r(x,y)]-\\beta D_{KL}(\\pi(\\cdot|x)\\|\\pi_{ref}(\\cdot|x))","symbols":["\\pi：待优化策略","r：奖励模型或环境奖励","\\pi_{ref}：参考策略","\\beta：KL 约束强度"],"intuition":"奖励推动策略改变，KL 把改变限制在参考模型附近；两者共同决定质量提升与策略漂移。"},
+      {"afterChapter":"dpo","label":"DPO 成对损失","latex":"\\mathcal{L}_{DPO}=-\\log\\sigma\\left(\\beta\\left[\\log\\frac{\\pi(y_w|x)}{\\pi_{ref}(y_w|x)}-\\log\\frac{\\pi(y_l|x)}{\\pi_{ref}(y_l|x)}\\right]\\right)","symbols":["y_w：chosen 回答","y_l：rejected 回答","\\pi：训练策略","\\pi_{ref}：冻结参考策略"],"intuition":"目标提升 chosen 相对 rejected 的策略优势，并用参考模型扣除两者原本的概率偏好。"}
+    ],
+    "workedExample":{"title":"用固定 log-prob 验证 DPO loss","steps":["指定 policy/reference 的 chosen 与 rejected 四个序列 log-prob。","计算两组 log-ratio、β 缩放、logsigmoid 与 batch loss。","交换标签并改变 β，验证符号、单调性和梯度方向。"],"result":"只有 policy 相对 reference 更偏向 chosen 时，DPO margin 才为正。"},
+    "implementationMap":[{"concept":"数据对","code":"prompt + chosen/rejected collator","note":"统一模板、截断、EOS 和回答 mask。"},{"concept":"序列概率","code":"log_softmax → gather → masked sum","note":"核对 [B,2,L,V] 到 [B,2]。"},{"concept":"参考锚点","code":"frozen reference forward/cache","note":"绑定模型和 tokenizer 版本。"},{"concept":"训练门禁","code":"margin + KL + capability evals","note":"避免只按 preference accuracy 选模型。"}],
+    "limitations":["静态偏好不能覆盖策略分布外行为。","长度、格式和自信语气可能成为奖励代理。","Reference 与 β 的选择影响策略漂移和拟合强度。","单轮序列偏好不等于多步 Agent 的环境成功。"],
+    "takeaways":["把数据协议、训练目标和评测作为同一对齐系统。","DPO 省去显式奖励模型和在线 PPO，但仍依赖 reference。","先单元测试序列 log-prob、mask 和损失符号。","偏好胜率必须与能力、安全和真实任务指标共同报告。"]
+  },
+  {
+    "slug": "kv-cache-to-continuous-batching",
+    "chapters": [
+      {
+        "id": "problem",
+        "title": "问题设定：自回归生成为什么既慢又吃显存",
+        "paragraphs": [
+          "语言模型生成第 t 个 token 时，需要让当前 query 与此前 1…t 个 token 的 key/value 做注意力。若每步重新计算全部历史 K/V，重复计算会随序列增长。KV Cache 保存每层历史 key 和 value，使 decode 只计算新 token 的投影；代价是缓存容量随层数、KV heads、head dimension、序列长度和并发线性增长。",
+          "服务系统同时面对不同到达时间、prompt 长度和输出长度的请求。静态 batch 必须等待最慢请求，结束的槽位无法立刻复用。Continuous Batching 在每个调度迭代重新组合运行集合，让完成请求释放的容量马上接纳新请求。理解性能必须把模型 kernel、KV 内存管理和请求调度放在同一条时间线上。"
+        ]
+      },
+      {
+        "id": "phases",
+        "title": "Prefill 与 Decode：两种不同工作负载",
+        "paragraphs": [
+          "Prefill 一次处理整个 prompt，Q/K/V 形状包含较长序列维度，矩阵乘法规模大、并行度高，通常更偏计算密集；它还要把所有 prompt token 的 K/V 写入缓存。TTFT 包含排队、prefill 和首次采样，因此长 prompt 会阻塞其他请求的首 token。",
+          "Decode 每次只处理一个新 token，却要读取全部历史 K/V。小矩阵计算难以充分利用 GPU，随着上下文增长，显存带宽和缓存读取更突出。TPOT 衡量连续 token 间隔，直接影响交互流畅度。把 prefill 与 decode 混在一个平均 latency 中，会掩盖长 prompt 阻塞和长上下文带宽瓶颈。"
+        ]
+      },
+      {
+        "id": "memory",
+        "title": "KV 容量模型与碎片问题",
+        "paragraphs": [
+          "对标准 MHA，每 token 每层保存 H_kv 个 key 和 H_kv 个 value，每个向量维度 D，元素字节数为 b。单请求缓存随当前长度 L 增长。GQA/MQA 通过减少 KV heads 降低容量，但 query heads 仍可更多。容量规划必须使用模型真实 H_kv，而不是用 attention heads 代替。",
+          "传统实现为请求预留连续、按最大长度估算的缓存，会产生内部浪费；不同长度请求的分配释放还带来外部碎片。PagedAttention 借鉴虚拟内存，把逻辑 KV 序列切成固定大小 block，用 block table 映射到非连续物理块，只在需要时分配。它改善的是内存利用、共享和调度灵活性，不改变注意力读取历史 token 的渐近计算量。[1]"
+        ]
+      },
+      {
+        "id": "scheduling",
+        "title": "Continuous Batching：每一步都重新做容量决策",
+        "paragraphs": [
+          "调度器维护 waiting、running 和可能的 swapped/preempted 队列。每个迭代先确定 token budget 与可用 KV blocks，再决定接纳哪些 prefill、推进哪些 decode。完成请求释放 blocks，新请求可立即进入；当容量不足时，系统可能拒绝、抢占、重算或换出。策略不同会改变吞吐、TTFT、TPOT 和公平性。",
+          "大 batch 提高吞吐但不一定满足 SLO。长 prefill 若一次占满 token budget，会让正在交互的 decode 等待；chunked prefill 将其分块，与 decode 交错执行。优先级和 deadline 调度能保护关键请求，却可能使低优先级饥饿。正确优化目标不是最大 batch size，而是在真实长度和到达分布下最大化 SLO 内完成的有效 token。"
+        ]
+      },
+      {
+        "id": "example",
+        "title": "容量例子：一台 GPU 能承载多少并发",
+        "paragraphs": [
+          "假设模型 32 层、8 个 KV heads、head dimension 128、BF16 两字节。每 token KV 为 2×32×8×128×2=131072 字节，即 128 KiB。一个 4096-token 请求仅 KV 就约 512 MiB；20 个同长度请求约 10 GiB，尚未计入权重、激活、workspace 和碎片。这个数量级说明并发通常先受 KV 容量限制。",
+          "若实际请求长度分布从 128 到 8192，按最大长度静态预留会浪费大量显存。用 16-token block 时，单请求尾块最多浪费 15 个位置，代价是 block table 与更复杂的 kernel 寻址。系统需要记录 allocated/used blocks、前缀共享命中、抢占次数和 OOM 拒绝，才能验证分页是否真正转化成更高 SLO 吞吐。"
+        ]
+      },
+      {
+        "id": "implementation",
+        "title": "实现路径：队列、Block Manager 与执行器",
+        "paragraphs": [
+          "源码阅读从请求状态机开始，确认请求何时进入 waiting、running、finished 和 preempted。接着查看 scheduler 如何计算 token budget、sequence slots 与 priority，再沿 block manager 追踪逻辑 block 到物理 block、引用计数和释放。最后定位 model runner 如何把选中序列、slot mapping 和 KV 地址传给 attention kernel。[2]",
+          "性能观测要把排队、调度、prefill、decode、采样和通信分段。至少报告 TTFT 与 TPOT 的 P50/P95/P99、tokens/s、KV 使用率、prefix cache hit、抢占、拒绝和 SLO attainment。只报离线 tokens/s 会鼓励过度批处理；只报单请求延迟则无法反映容量和成本。"
+        ]
+      },
+      {
+        "id": "boundaries",
+        "title": "常见误区与策略边界",
+        "paragraphs": [
+          "PagedAttention 不是 FlashAttention：前者主要管理跨 decode step 持久存在的 KV blocks，后者主要降低一次注意力计算的 HBM IO。Continuous Batching 也不保证每个请求更快，它通常以更高资源利用换取排队与批内干扰。概念混用会导致错误归因。",
+          "真正的配置选择依赖负载。在线聊天重视 TTFT/TPOT 和尾延迟，需限制大 prefill；离线生成可扩大 batch；共享系统还要考虑租户公平、前缀隐私和缓存污染。容量测试应使用生产长度、到达率和输出终止分布，并逐步逼近饱和点，找到吞吐仍上升但 SLO 完成率开始下降的位置。"
+        ]
+      }
+    ],
+    "formulas": [
+      {"afterChapter":"memory","label":"KV Cache 容量","latex":"M_{KV}=B\\cdot L\\cdot N_{layer}\\cdot 2H_{kv}D\\cdot b","symbols":["B：并发序列数","L：缓存长度","N_{layer}：层数","H_{kv}：KV heads","D：head dimension","b：每元素字节数"],"intuition":"KV 容量对并发和长度都线性增长；GQA/MQA 降低 H_kv，因此直接扩大可服务并发。"},
+      {"afterChapter":"scheduling","label":"SLO 有效吞吐","latex":"\\operatorname{Goodput}=\\frac{\\sum_r \\operatorname{tokens}(r)\\,\\mathbf{1}[r\\;\\text{meets SLO}]}{\\Delta t}","symbols":["r：一个请求","tokens(r)：请求生成 token 数","SLO：TTFT/TPOT/完成时间门槛","\\Delta t：观测窗口"],"intuition":"超过延迟门槛的吞吐不再计入有效产出，避免系统用牺牲用户体验的方式制造更高 tokens/s。"}
+    ],
+    "workedExample":{"title":"为一个模型手算 KV 容量和并发上限","steps":["从模型配置读取层数、KV heads、head dimension 和 dtype 字节数。","计算每 token KV 字节数，再乘以一组真实长度分布。","扣除权重与运行时余量，比较连续分配和 16-token blocks 的浪费。"],"result":"得到的是容量上界；实际并发还受调度、kernel workspace、抢占和延迟 SLO 限制。"},
+    "implementationMap":[{"concept":"请求生命周期","code":"waiting/running/preempted/finished queues","note":"记录每次状态迁移与排队时间。"},{"concept":"KV 分页","code":"block table + physical block allocator","note":"检查引用计数、尾块浪费和释放。"},{"concept":"批调度","code":"token budget + admit/select","note":"分开 prefill 与 decode 配额。"},{"concept":"执行","code":"slot mapping → attention kernel","note":"验证逻辑位置映射到正确 KV 地址。"}],
+    "limitations":["KV 容量估算不包含权重、workspace 和碎片余量。","Continuous Batching 提高吞吐时可能恶化单请求尾延迟。","PagedAttention 改善内存管理，不消除长上下文读取成本。","Prefix cache 带来版本、隔离和隐私边界。"],
+    "takeaways":["Prefill 与 decode 必须用不同性能模型分析。","用真实 KV heads 计算每 token 缓存，而非 query heads。","同时观察吞吐、TTFT、TPOT、KV 使用和 SLO goodput。","调度策略要由真实到达与长度分布驱动。"]
+  },
+  {
+    "slug": "agent-state-verification-recovery",
+    "chapters": [
+      {
+        "id": "problem",
+        "title": "问题设定：会调用工具不等于可靠 Agent",
+        "paragraphs": [
+          "一个模型能生成结构正确的工具调用，只说明接口可用，不说明任务可靠。真实 Agent 会读写外部系统、跨多步积累状态，并面对超时、权限变化、部分成功和用户中断。若把全部状态塞进对话文本，模型可能忘记、误读或重复执行；若重试写操作而不检查外部结果，可能重复扣款、发布或发消息。",
+          "可靠 Agent 应拆成模型与 harness。模型负责提出候选动作和解释，harness 负责权威状态、权限、工具执行、验证、停止条件、审计和恢复。目标不是让模型永不犯错，而是让每个错误在产生高影响副作用前被发现，且失败后系统能从已知 checkpoint 继续，而不是从自然语言猜测当前世界。"
+        ]
+      },
+      {
+        "id": "state",
+        "title": "三类状态：上下文、工作记忆与业务真相",
+        "paragraphs": [
+          "模型上下文适合保存当前任务所需的短期信息和可压缩观察，但它受长度限制，也不具备事务语义。工作记忆用于检索历史事实、文档或经验，可能过期且通常不是权威来源。业务状态位于数据库、工单、代码仓库或外部 API，必须通过工具读取并用版本、时间和身份校验。",
+          "设计时要为每个字段指定 owner：例如“用户意图摘要”可由模型生成，“部署版本”必须来自发布系统，“审批状态”必须来自权限服务。Checkpoint 保存恢复所需的最小确定状态，包括 run_id、state_version、已提交副作用、待处理步骤和证据引用。不要把整段对话 dump 当作可恢复状态。"
+        ]
+      },
+      {
+        "id": "loop",
+        "title": "控制循环：Plan、Act、Observe、Verify、Recover",
+        "paragraphs": [
+          "每一步应产生结构化 trace envelope：run_id 标识任务，step_id 标识动作，parent_step 表示因果关系，输入摘要和状态版本用于重放。模型提出 action 后，policy 先检查权限、参数约束和风险级别；tool gateway 执行后返回机器可读结果；verifier 再检查外部 postcondition，而不是相信“200 OK”或模型自述。",
+          "Anthropic 将 workflow 与 agent 区分为预定义路径和模型动态决策两类，并强调从简单、可组合模式开始。[1] 生产系统应优先把确定步骤写成 workflow，只在需要不确定判断时调用模型。动态性越高，越需要显式预算、循环上限、工具白名单和升级策略。"
+        ]
+      },
+      {
+        "id": "idempotency",
+        "title": "副作用协议：幂等键、前置条件与执行后验证",
+        "paragraphs": [
+          "高质量工具不仅有 JSON schema，还要定义副作用语义。写操作接收 caller-stable idempotency key，服务端把 key 与结果绑定；同一 key 重试应返回原结果而不是再次创建。前置条件可以是资源版本、当前状态或审批 token，防止 Agent 基于过期观察覆盖他人更改。",
+          "执行后验证必须读取权威外部状态。例如发布 API 超时并不表示发布失败：系统应先按幂等键查询部署，再决定重试。Postcondition 要描述可验证事实，如“目标版本已成为生产版本且健康检查通过”，而非“工具返回 success”。不可逆或高影响动作还需要人工批准，并把批准范围绑定到具体参数和版本。"
+        ]
+      },
+      {
+        "id": "example",
+        "title": "最小例子：可恢复的网站发布 Agent",
+        "paragraphs": [
+          "定义 draft、validated、published、verified 四个状态。Agent 先生成候选版本，测试通过后写入 validated checkpoint。发布工具使用 deployment_id 作为幂等键；若调用超时，恢复逻辑查询该 id 是否存在。存在则进入 published 并执行健康检查，不存在才允许同 key 重试。验证失败时不再次发布，而是记录证据并进入 rollback 或人工升级。",
+          "这个状态机把“看起来完成”变成可证明的外部事实。每次迁移都包含 from_version，数据库通过 compare-and-swap 防止两个 worker 同时推进。用户中断时，系统停在最后 checkpoint；恢复时重新读取生产状态并验证，而非根据最后一条模型消息推断。由此可以测试超时但成功、重复回调、权限撤销和健康检查失败。"
+        ]
+      },
+      {
+        "id": "evaluation",
+        "title": "过程级评测：最终答案之外测什么",
+        "paragraphs": [
+          "只比较最终文本会漏掉危险路径：Agent 可能得到正确答案，却调用了禁止工具、泄露数据、重复写入或依靠人工悄悄修正。回放用例应固定初始状态、允许/禁止动作、模拟工具结果、期望状态迁移、最大成本和最终 postcondition。评测器同时检查轨迹与外部状态。",
+          "生产事故要转成最小 replay case，而不是只补 system prompt。保留导致失败的状态版本、工具响应与恢复选择，替换隐私数据后加入回归集。发布门禁至少覆盖任务成功率、禁止动作零容忍、重复副作用为零、恢复成功率和单位成功任务成本。OpenAI Agents SDK 的 tracing、handoff 与 guardrail 机制可以作为实现参考，但业务状态与权限仍需应用自己定义。[2]"
+        ]
+      },
+      {
+        "id": "boundaries",
+        "title": "架构边界：哪些判断不能交给模型",
+        "paragraphs": [
+          "模型的自然语言置信度不能代替授权、身份验证、余额检查或事务提交。任何高影响动作都应由确定性 policy 和外部权威状态约束。长 prompt 也不能代替工具幂等：模型即使记得“不重复”，仍无法判断上次超时调用是否已在服务器生效。",
+          "另一方面，过度固定 workflow 会失去 Agent 处理开放任务的价值。合理边界是把权限、状态一致性和恢复写成硬约束，把方案探索、信息归纳和候选动作交给模型。系统的成熟度不以调用模型次数衡量，而以失败是否可见、可阻断、可重放以及升级路径是否确定衡量。"
+        ]
+      }
+    ],
+    "formulas": [
+      {"afterChapter":"loop","label":"一次动作的提交条件","latex":"\\operatorname{commit}(s,a,r)\\iff P(s,a)\\land V(r,s')\\land \\operatorname{version}(s')=\\operatorname{version}(s)+1","symbols":["s：动作前权威状态","a：候选动作","P：权限与前置条件","r：工具结果","V：执行后验证","s'：新状态"],"intuition":"工具返回只是证据之一；只有权限、前置条件、postcondition 和版本迁移同时成立，状态才提交。"},
+      {"afterChapter":"idempotency","label":"幂等执行语义","latex":"\\operatorname{execute}(k,a)=\\operatorname{execute}(k,a)\\quad\\text{for repeated calls with the same }k","symbols":["k：调用方稳定生成的幂等键","a：参数完全相同的副作用动作"],"intuition":"同一任务步骤无论因超时重试多少次，都应观察到同一个外部结果，而不是产生多个对象。"}
+    ],
+    "workedExample":{"title":"验证一次超时但实际成功的发布","steps":["第一次 publish 返回超时，但模拟服务端已创建 deployment_id。","恢复逻辑按幂等键查询外部状态，不直接发起第二次创建。","健康检查通过后提交 verified checkpoint，并断言只存在一个部署。"],"result":"网络超时不再等同于业务失败，恢复不会复制副作用。"},
+    "implementationMap":[{"concept":"状态","code":"versioned state store + checkpoint","note":"区分模型摘要与权威业务字段。"},{"concept":"权限","code":"policy.authorize(action,state)","note":"按动作、参数和风险确定审批。"},{"concept":"执行","code":"tool gateway + idempotency key","note":"统一超时、错误语义和审计。"},{"concept":"验证","code":"postcondition verifier","note":"读取外部事实再提交状态。"},{"concept":"回放","code":"trace → replay case","note":"检查轨迹、成本和最终状态。"}],
+    "limitations":["模型上下文不能承担事务和权威状态。","幂等键需要服务端真正存储并验证参数一致性。","外部系统若不提供可查询状态，恢复能力会受限。","动态规划提高适应性，也扩大评测空间和成本方差。"],
+    "takeaways":["把模型视为候选动作生成器，把 harness 视为控制系统。","为每类状态指定权威 owner 和版本语义。","任何副作用都需要前置条件、幂等和 postcondition。","用生产 trace 构建过程级回放与发布门禁。"]
+  },
+  {
+    "slug": "holistic-llm-evaluation",
+    "chapters": [
+      {
+        "id": "problem",
+        "title": "问题设定：评测的对象不是抽象“智能”",
+        "paragraphs": [
+          "模型没有一个脱离场景的单一质量。摘要、代码修改、客服拒答和 Agent 发布分别有不同成功条件与失败成本。整体评测先定义 scenario：用户是谁、输入如何分布、允许哪些工具、错误造成什么后果，再选择数据和指标。若先看到公开榜单再反推目标，分数很容易与产品决策脱节。",
+          "HELM 提出以场景和多指标系统性评估模型，覆盖准确性、校准、鲁棒性、公平性、偏差、毒性与效率等维度。[1] 核心思想不是指标越多越好，而是明确取舍：一个模型可能更准确却更贵、更慢或在某个风险切片更差。评测报告应保留这种结构，而不是压成无法审计的总分。"
+        ]
+      },
+      {
+        "id": "matrix",
+        "title": "Scenario × Metric × Slice：建立决策矩阵",
+        "paragraphs": [
+          "Scenario 定义任务与交互条件，metric 定义成功度量，slice 定义需要单独观察的子分布。比如代码 Agent 的总体任务成功率可能不错，但“涉及数据库迁移”的切片失败率很高；平均分会隐藏上线风险。每个切片应来自威胁模型、用户分布或已知失败机制，而不是事后挑选好看的分组。",
+          "指标要对应可行动的决策。Exact match 适合唯一答案，执行测试适合代码，人工 rubric 适合开放写作，工具轨迹和最终外部状态适合 Agent。成本与延迟不是附录：应记录输入/输出 token、缓存命中、调用次数、墙钟时间和单位成功任务成本。若模型更贵但成功率只微升，是否采用取决于业务失败成本。"
+        ]
+      },
+      {
+        "id": "reproducibility",
+        "title": "可复现协议：冻结所有影响输出的变量",
+        "paragraphs": [
+          "同名 benchmark 分数可能因为 prompt、few-shot 样本、样本顺序、chat template、解码参数或库版本不同而不可比。评测配置应固定模型 revision、endpoint、tokenizer、prompt 模板、few-shot、seed、temperature、max tokens、停止条件、数据 commit 和评分器版本，并保存逐样本原始输出。",
+          "对于 API 模型，还要记录请求日期和供应商返回的版本标识，因为服务端更新会破坏长期可比性。无法固定的变量要在结论中声明。评测工具如 lm-evaluation-harness 能标准化任务和配置，但框架本身不能保证业务场景有效；使用者仍要审查 task 定义、doc_to_text、few-shot 与 metric 聚合路径。[2]"
+        ]
+      },
+      {
+        "id": "statistics",
+        "title": "统计解释：置信区间、配对比较与最差切片",
+        "paragraphs": [
+          "有限样本分数是估计值，不是精确常数。二元成功率可报告 Wilson 或 bootstrap 置信区间；开放指标可对样本 bootstrap。比较两个模型时尽量使用相同样本的配对差异，因为样本难度被抵消，方差更小。只看点估计的 1% 提升，可能只是采样噪声。",
+          "聚合方式也表达价值判断。Micro average 让大切片权重更高，macro average 让每类等权，最差切片强调风险下界。发布门禁应在设计前写明：例如总体成功率不下降超过 1 个百分点，高风险切片零严重失败，P95 延迟低于阈值。评测后临时改阈值会制造选择性结论。"
+        ]
+      },
+      {
+        "id": "judges",
+        "title": "开放式生成：人审与 LLM Judge 的校准",
+        "paragraphs": [
+          "开放回答难以用 exact match。人审需要清晰 rubric、盲化模型身份、随机呈现顺序和一致性测量。LLM Judge 提升规模，却可能偏好更长、更像自身风格或先出现的答案，也可能无法验证事实与执行结果。应让评分器输出理由和结构化维度，并用一组人审金标估计一致率。",
+          "重要结论不应依赖单一 judge。可以组合规则验证、任务执行、人类评审和多个 judge，保留分歧样本供人工审查。若 judge 与人类在某类内容上系统性分歧，应按切片报告而非简单平均。任何评分器版本变化都相当于换量尺，需要重新校准历史基线。"
+        ]
+      },
+      {
+        "id": "gates",
+        "title": "从评测到发布门禁与持续回归",
+        "paragraphs": [
+          "离线报告只有在影响发布决策时才产生工程价值。门禁输入应是版本化评测集和阈值，输出为可解释 pass/fail：哪些场景退化、置信区间如何、严重失败样本是什么。门禁必须区分阻断项和观察项，避免数十个噪声指标让团队无法发布，也避免关键安全问题被平均分稀释。",
+          "线上失败要经过脱敏和最小化，转成带 provenance 的回归用例。用例记录首次发现版本、失败机制、修复版本和保留期限。持续评测应监控数据污染：当提示设计或训练过程反复接触测试集，它就不再是独立证据，需要冻结旧集并引入新鲜时序切片。"
+        ]
+      },
+      {
+        "id": "boundaries",
+        "title": "边界与误区：基准不是现实的替身",
+        "paragraphs": [
+          "公开 benchmark 适合建立共同语言和研究比较，但可能过时、被训练数据污染，或与真实用户任务差异巨大。高榜单分数不证明生产可靠，少量内部任务也不证明一般能力。稳妥做法是分层：标准基准测可比能力，真实任务集测产品价值，风险集测不可接受失败，线上监控测分布漂移。",
+          "评测也不能消除价值判断。选择哪些场景、如何分配权重、什么风险零容忍，都需要产品、研究、安全和业务共同决定。专业评测的标志不是一个复杂分数，而是结论可追溯到逐样本证据、配置和预先定义的决策规则，并明确哪些问题仍未知。"
+        ]
+      }
+    ],
+    "formulas": [
+      {"afterChapter":"statistics","label":"配对成功率差","latex":"\\hat{\\Delta}=\\frac{1}{N}\\sum_{i=1}^{N}\\left(s_i^{(A)}-s_i^{(B)}\\right)","symbols":["N：共同评测样本数","s_i^{(A)}：模型 A 在样本 i 的得分","s_i^{(B)}：模型 B 在同一样本的得分"],"intuition":"对同一批样本逐项做差可消除样本难度差异，比比较两个独立均值更敏感也更公平。"},
+      {"afterChapter":"matrix","label":"单位成功任务成本","latex":"C_{success}=\\frac{\\sum_i C_i}{\\sum_i \\mathbf{1}[\\operatorname{success}_i]}","symbols":["C_i：样本 i 的模型、工具与基础设施成本","success_i：样本是否满足完整成功条件"],"intuition":"按成功任务而非请求计价，会同时惩罚昂贵调用和低成功率，适合比较不同 Agent 策略。"}
+    ],
+    "workedExample":{"title":"为代码 Agent 设计一个上线门禁","steps":["按常规修改、依赖升级、数据库迁移和权限相关任务建立切片。","冻结模型、prompt、工具镜像与数据 commit，保存逐任务轨迹和测试结果。","预先定义总体成功率、严重副作用、P95 时延和单位成功成本阈值。"],"result":"即使总体分数提升，数据库迁移切片出现严重副作用也会阻断发布。"},
+    "implementationMap":[{"concept":"任务定义","code":"task config + dataset revision","note":"固定场景、prompt、few-shot 和样本来源。"},{"concept":"执行记录","code":"request/response/trace telemetry","note":"保存逐样本输出、token、延迟与错误。"},{"concept":"评分","code":"rules + execution + calibrated judges","note":"组合证据并保留评分器版本。"},{"concept":"统计","code":"slice aggregate + bootstrap CI","note":"报告配对差和最差切片。"},{"concept":"门禁","code":"predefined thresholds → pass/fail","note":"区分阻断项与观察项。"}],
+    "limitations":["公开基准可能污染、过时或脱离产品分布。","LLM Judge 会引入位置、长度和风格偏差。","小样本切片的点估计波动大，必须报告不确定性。","评测设计仍包含场景选择和风险权重的价值判断。"],
+    "takeaways":["先定义场景与失败成本，再选择数据和指标。","保存逐样本证据与完整配置，确保结果可复现。","用切片、置信区间和配对比较替代单一总分。","把关键指标写成预先定义的发布门禁和持续回归。"]
+  }
+]

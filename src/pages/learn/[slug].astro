@@ -1,5 +1,7 @@
 ---
 import Layout from '../../components/Layout.astro';
+import MathBlock from '../../components/MathBlock.astro';
+import articles from '../../data/articles.json';
 import lessons from '../../data/lessons.json';
 import tracks from '../../data/tracks.json';
 
@@ -8,15 +10,16 @@ export function getStaticPaths() {
 }
 
 const { lesson } = Astro.props;
+const article = articles.find(item => item.slug === lesson.slug);
+if (!article) throw new Error(`Missing article for ${lesson.slug}`);
 const track = tracks.find(item => item.id === lesson.track);
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const sections = [
   ['objectives', '学习目标'],
-  ['model', '心智模型'],
-  ['mechanism', '机制拆解'],
-  ['code', '张量与代码'],
-  ['decision', '决策表'],
+  ...article.chapters.map(chapter => [chapter.id, chapter.title]),
+  ['implementation-map', '实现映射'],
   ['lab', '动手实验'],
+  ['boundaries-summary', '边界与总结'],
   ['check', '自检与来源']
 ];
 ---
@@ -25,7 +28,7 @@ const sections = [
   <article class="lesson-shell shell">
     <nav class="breadcrumb" aria-label="面包屑"><a href={`${base}/learn/`}>课程体系</a><span>/</span><a href={`${base}/learn/#${track?.id}`}>{track?.title}</a><span>/</span><span>L{String(lesson.order).padStart(2, '0')}</span></nav>
     <header class="research-lesson-hero">
-      <div class="lesson-labels"><span>{track?.stage}</span><span>{lesson.difficulty}</span><span>{lesson.duration}</span><span>更新 {lesson.updatedAt}</span></div>
+      <div class="lesson-labels"><span>{track?.stage}</span><span>{lesson.difficulty}</span><span>{lesson.duration}</span><span>长文 · {article.chapters.length} 章</span><span>更新 {lesson.updatedAt}</span></div>
       <h1>{lesson.title}</h1>
       <p>{lesson.description}</p>
       <div class="term-row">{lesson.keyTerms.map((term: string) => <span>{term}</span>)}</div>
@@ -33,55 +36,66 @@ const sections = [
 
     <div class="lesson-layout">
       <aside class="lesson-toc">
-        <p>CONTENTS</p>
+        <p>文章目录</p>
         <ol>{sections.map(([id, label], index) => <li><a href={`#${id}`}><span>{String(index + 1).padStart(2, '0')}</span>{label}</a></li>)}</ol>
         <div><strong>先修知识</strong><ul>{lesson.prerequisites.map((item: string) => <li>{item}</li>)}</ul></div>
       </aside>
 
       <div class="lesson-content">
         <section class="lesson-section objectives" id="objectives">
-          <header><span>01</span><div><p>LEARNING OBJECTIVES</p><h2>学习目标</h2></div></header>
+          <header><span>00</span><div><p>LEARNING CONTRACT</p><h2>读完后你应该能做到</h2></div></header>
           <ol class="objective-list">{lesson.objectives.map((item: string) => <li>{item}</li>)}</ol>
-          <div class="concept-map"><strong>概念地图</strong>{lesson.conceptMap.map((item: string, index: number) => <div><span>{index + 1}</span><p>{item}</p></div>)}</div>
-        </section>
-
-        <section class="lesson-section" id="model">
-          <header><span>02</span><div><p>MENTAL MODEL</p><h2>先建立正确的心智模型</h2></div></header>
           <blockquote>{lesson.mentalModel}</blockquote>
         </section>
 
-        <section class="lesson-section" id="mechanism">
-          <header><span>03</span><div><p>MECHANISM</p><h2>机制拆解</h2></div></header>
-          <ol class="mechanism-list">{lesson.mechanism.map((item: string, index: number) => <li><span>{String(index + 1).padStart(2, '0')}</span><p>{item}</p></li>)}</ol>
-        </section>
+        {article.chapters.map((chapter, chapterIndex) => (
+          <section class="lesson-section article-chapter" id={chapter.id}>
+            <header><span>{String(chapterIndex + 1).padStart(2, '0')}</span><div><p>CORE CHAPTER</p><h2>{chapter.title}</h2></div></header>
+            <div class="article-prose">
+              {chapter.paragraphs.map((paragraph: string) => <p>{paragraph}</p>)}
+            </div>
+            {article.formulas.filter(formula => formula.afterChapter === chapter.id).map(formula => <MathBlock {...formula} />)}
+          </section>
+        ))}
 
-        <section class="lesson-section" id="code">
-          <header><span>04</span><div><p>TENSOR & CODE PATH</p><h2>张量与代码路径</h2></div></header>
+        <section class="lesson-section" id="implementation-map">
+          <header><span>{String(article.chapters.length + 1).padStart(2, '0')}</span><div><p>CODE & TENSOR MAP</p><h2>从概念落到实现</h2></div></header>
           <div class="tensor-flow">{lesson.tensorFlow.map((item: string) => <code>{item}</code>)}</div>
+          <div class="implementation-map">
+            {article.implementationMap.map(row => <div><strong>{row.concept}</strong><code>{row.code}</code><p>{row.note}</p></div>)}
+          </div>
           <div class="code-grid">
             <div><strong>源码阅读顺序</strong><ol>{lesson.codePath.map((item: string) => <li>{item}</li>)}</ol></div>
             <pre><code>{lesson.pseudocode.join('\n')}</code></pre>
           </div>
-          <div class="engineering-note"><strong>工程意义</strong><ul>{lesson.engineeringMeaning.map((item: string) => <li>{item}</li>)}</ul></div>
+          <div class="worked-example">
+            <span>WORKED EXAMPLE</span><h3>{article.workedExample.title}</h3>
+            <ol>{article.workedExample.steps.map((item: string) => <li>{item}</li>)}</ol>
+            <p><strong>应得到：</strong>{article.workedExample.result}</p>
+          </div>
         </section>
 
-        <section class="lesson-section" id="decision">
-          <header><span>05</span><div><p>ENGINEERING DECISIONS</p><h2>决策表</h2></div></header>
+        <section class="lesson-section lab-section" id="lab">
+          <header><span>{String(article.chapters.length + 2).padStart(2, '0')}</span><div><p>HANDS-ON LAB</p><h2>动手实验与验收</h2></div></header>
+          <h3>{lesson.lab.title}</h3>
+          <ol>{lesson.lab.steps.map((item: string) => <li>{item}</li>)}</ol>
+          <div class="success-box"><strong>验收标准</strong><ul>{lesson.lab.successCriteria.map((item: string) => <li>{item}</li>)}</ul></div>
+        </section>
+
+        <section class="lesson-section" id="boundaries-summary">
+          <header><span>{String(article.chapters.length + 3).padStart(2, '0')}</span><div><p>BOUNDARIES & TAKEAWAYS</p><h2>工程决策表、失败边界与结论</h2></div></header>
+          <div class="boundary-grid">
+            <div><strong>不要忽略的边界</strong><ul>{article.limitations.map((item: string) => <li>{item}</li>)}</ul></div>
+            <div><strong>四条结论</strong><ol>{article.takeaways.map((item: string) => <li>{item}</li>)}</ol></div>
+          </div>
           <div class="decision-table" role="table">
             <div class="decision-head" role="row"><span>条件</span><span>选择</span><span>理由</span></div>
             {lesson.decisionTable.map((row: any) => <div class="decision-row" role="row"><p>{row.condition}</p><strong>{row.choose}</strong><p>{row.because}</p></div>)}
           </div>
         </section>
 
-        <section class="lesson-section lab-section" id="lab">
-          <header><span>06</span><div><p>HANDS-ON LAB</p><h2>动手实验</h2></div></header>
-          <h3>{lesson.lab.title}</h3>
-          <ol>{lesson.lab.steps.map((item: string) => <li>{item}</li>)}</ol>
-          <div class="success-box"><strong>验收标准</strong><ul>{lesson.lab.successCriteria.map((item: string) => <li>{item}</li>)}</ul></div>
-        </section>
-
         <section class="lesson-section" id="check">
-          <header><span>07</span><div><p>SELF CHECK & SOURCES</p><h2>自检与一手资料</h2></div></header>
+          <header><span>{String(article.chapters.length + 4).padStart(2, '0')}</span><div><p>SELF CHECK & PRIMARY SOURCES</p><h2>自检与一手资料</h2></div></header>
           <ol class="self-check-list">{lesson.selfCheck.map((item: string, index: number) => <li><span>Q{index + 1}</span><p>{item}</p></li>)}</ol>
           <div class="source-list">
             {lesson.sources.map((source: any, index: number) => <a href={source.url} target="_blank" rel="noreferrer"><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{source.label}</strong><small>{source.type}</small></div><i>↗</i></a>)}

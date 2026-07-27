@@ -9,7 +9,7 @@ function daysBetween(now, date) {
   return Math.max(0, Math.floor((now.getTime() - Date.parse(`${date}T00:00:00Z`)) / 86400000));
 }
 
-export function buildReview({ frontier, lessons, tracks }, now = new Date()) {
+export function buildReview({ frontier, lessons, tracks, articles = [], syllabus = [] }, now = new Date()) {
   const categoryCoverage = Object.fromEntries(
     [...new Set(frontier.map(item => item.category))]
       .map(category => [category, frontier.filter(item => item.category === category).length])
@@ -46,11 +46,26 @@ export function buildReview({ frontier, lessons, tracks }, now = new Date()) {
   ).length;
   const sourceCount = frontier.reduce((sum, item) => sum + (item.sources?.length || 0), 0)
     + lessons.reduce((sum, item) => sum + (item.sources?.length || 0), 0);
+  const researchArticles = articles.filter(article =>
+    (article.chapters?.length || 0) >= 7
+    && article.chapters.flatMap(chapter => chapter.paragraphs || []).join('').length >= 1800
+    && (article.formulas?.length || 0) >= 2
+    && (article.limitations?.length || 0) >= 3
+  ).length;
+  const completeSyllabi = tracks.filter(track =>
+    syllabus.filter(item => item.track === track.id).length === track.plannedLessons
+  ).length;
   if (scoredFrontier < frontier.length) {
     gaps.push(`${frontier.length - scoredFrontier} 条前沿信号缺少完整四维评分。`);
   }
   if (deepLessons < lessons.length) {
     gaps.push(`${lessons.length - deepLessons} 节课程未达到目标/实验/双来源的深度标准。`);
+  }
+  if (articles.length && researchArticles < lessons.length) {
+    gaps.push(`${lessons.length - researchArticles} 节已发布课程尚未达到研究长文标准。`);
+  }
+  if (syllabus.length && completeSyllabi < tracks.length) {
+    gaps.push(`${tracks.length - completeSyllabi} 条路线的 syllabus 尚未完整公开。`);
   }
 
   return {
@@ -66,6 +81,8 @@ export function buildReview({ frontier, lessons, tracks }, now = new Date()) {
     quality: {
       frontierScoreCoverage: `${scoredFrontier}/${frontier.length}`,
       deepLessonCoverage: `${deepLessons}/${lessons.length}`,
+      researchArticleCoverage: `${researchArticles}/${lessons.length}`,
+      syllabusCoverage: `${completeSyllabi}/${tracks.length}`,
       directReferences: sourceCount
     },
     categoryCoverage,
@@ -90,7 +107,9 @@ function main() {
   const review = buildReview({
     frontier: readJson('src/data/frontier.json'),
     lessons: readJson('src/data/lessons.json'),
-    tracks: readJson('src/data/tracks.json')
+    tracks: readJson('src/data/tracks.json'),
+    articles: readJson('src/data/articles.json'),
+    syllabus: readJson('src/data/syllabus.json')
   });
   const output = resolve(projectRoot, 'ops/site-review.json');
   mkdirSync(dirname(output), { recursive: true });

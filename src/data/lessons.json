@@ -31,7 +31,8 @@
     "selfCheck": ["为什么总参数相同的 MoE 与 Dense 模型每 token 成本不同？", "专家负载不均如何同时影响吞吐和模型质量？", "哪些通信可以与专家计算重叠，前提是什么？"],
     "sources": [
       { "label": "DeepSeek-AI, DeepSeek-V3 Technical Report", "url": "https://arxiv.org/abs/2412.19437", "type": "技术报告" },
-      { "label": "NVIDIA, Scaling MoE pre-training on GB300 NVL72", "url": "https://developer.nvidia.com/blog/setting-a-world-record-for-moe-pre-training-on-nvidia-gb300-nvl72/", "type": "官方工程博客" }
+      { "label": "NVIDIA, Scaling MoE pre-training on GB300 NVL72", "url": "https://developer.nvidia.com/blog/setting-a-world-record-for-moe-pre-training-on-nvidia-gb300-nvl72/", "type": "官方工程博客" },
+      { "label": "NVIDIA Megatron Core MoE 官方源码", "url": "https://github.com/NVIDIA/Megatron-LM/tree/main/megatron/core/transformer/moe", "type": "官方源码" }
     ]
   },
   {
@@ -66,7 +67,8 @@
     "selfCheck": ["为什么对称损失要同时计算 image→text 和 text→image？", "温度参数过大或过小分别会怎样？", "CLIP 的零样本分类为什么不是无监督分类？"],
     "sources": [
       { "label": "Radford et al., Learning Transferable Visual Models From Natural Language Supervision", "url": "https://arxiv.org/abs/2103.00020", "type": "原始论文" },
-      { "label": "OpenAI CLIP 官方代码", "url": "https://github.com/openai/CLIP", "type": "官方源码" }
+      { "label": "OpenAI CLIP 官方代码", "url": "https://github.com/openai/CLIP", "type": "官方源码" },
+      { "label": "OpenAI, CLIP research release", "url": "https://openai.com/index/clip/", "type": "官方研究文章" }
     ]
   },
   {
@@ -101,7 +103,8 @@
     "selfCheck": ["为什么 DPO 仍需要 reference model？", "β 增大如何影响偏好拟合与策略漂移？", "偏好胜率提高为什么可能伴随基础能力下降？"],
     "sources": [
       { "label": "Ouyang et al., Training language models to follow instructions with human feedback", "url": "https://arxiv.org/abs/2203.02155", "type": "原始论文" },
-      { "label": "Rafailov et al., Direct Preference Optimization", "url": "https://arxiv.org/abs/2305.18290", "type": "原始论文" }
+      { "label": "Rafailov et al., Direct Preference Optimization", "url": "https://arxiv.org/abs/2305.18290", "type": "原始论文" },
+      { "label": "Hugging Face TRL DPO Trainer", "url": "https://huggingface.co/docs/trl/dpo_trainer", "type": "框架实现文档" }
     ]
   },
   {
@@ -136,7 +139,8 @@
     "selfCheck": ["为什么传统静态 batching 会被最长请求拖住？", "PagedAttention 改善的是计算复杂度还是内存管理？", "KV 接近满载时调度器有哪些策略，各自牺牲什么？"],
     "sources": [
       { "label": "Kwon et al., Efficient Memory Management for LLM Serving with PagedAttention", "url": "https://arxiv.org/abs/2309.06180", "type": "原始论文" },
-      { "label": "vLLM 官方文档", "url": "https://docs.vllm.ai/", "type": "官方文档" }
+      { "label": "vLLM 官方文档", "url": "https://docs.vllm.ai/", "type": "官方文档" },
+      { "label": "vLLM Project 官方源码", "url": "https://github.com/vllm-project/vllm", "type": "官方源码" }
     ]
   },
   {
@@ -171,7 +175,8 @@
     "selfCheck": ["哪些信息应留在模型上下文，哪些必须进入外部状态？", "如何证明一次重试不会重复扣款或发布？", "为什么只比较最终答案会漏掉高风险回归？"],
     "sources": [
       { "label": "Anthropic, Building effective agents", "url": "https://www.anthropic.com/research/building-effective-agents", "type": "官方研究文章" },
-      { "label": "OpenAI Agents SDK 文档", "url": "https://openai.github.io/openai-agents-python/", "type": "官方文档" }
+      { "label": "OpenAI Agents SDK 文档", "url": "https://openai.github.io/openai-agents-python/", "type": "官方文档" },
+      { "label": "OpenAI Agents SDK 官方源码", "url": "https://github.com/openai/openai-agents-python", "type": "官方源码" }
     ]
   },
   {
@@ -206,7 +211,8 @@
     "selfCheck": ["为什么两个论文中的同名 benchmark 分数可能不可比？", "何时应该报告宏平均、微平均或最差切片？", "如何防止评测集逐渐被提示和训练过程污染？"],
     "sources": [
       { "label": "Liang et al., Holistic Evaluation of Language Models", "url": "https://arxiv.org/abs/2211.09110", "type": "原始论文" },
-      { "label": "EleutherAI, Language Model Evaluation Harness", "url": "https://github.com/EleutherAI/lm-evaluation-harness", "type": "开源评测框架" }
+      { "label": "EleutherAI, Language Model Evaluation Harness", "url": "https://github.com/EleutherAI/lm-evaluation-harness", "type": "开源评测框架" },
+      { "label": "Stanford CRFM HELM 官方源码", "url": "https://github.com/stanford-crfm/helm", "type": "官方源码" }
     ]
   }
 ]

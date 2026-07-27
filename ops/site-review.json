@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-27T07:45:20.412Z",
+  "generatedAt": "2026-07-27T08:13:53.211Z",
   "summary": {
     "frontierItems": 4,
     "lessons": 6,
@@ -11,7 +11,9 @@
   "quality": {
     "frontierScoreCoverage": "4/4",
     "deepLessonCoverage": "6/6",
-    "directReferences": 16
+    "researchArticleCoverage": "6/6",
+    "syllabusCoverage": "6/6",
+    "directReferences": 22
   },
   "categoryCoverage": {
     "模型架构": 1,

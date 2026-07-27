@@ -1,0 +1,29 @@
+---
+import katex from 'katex';
+
+interface Props {
+  label: string;
+  latex: string;
+  symbols: string[];
+  intuition: string;
+}
+
+const { label, latex, symbols, intuition } = Astro.props;
+const html = katex.renderToString(latex, {
+  displayMode: true,
+  throwOnError: true,
+  output: 'htmlAndMathml'
+});
+---
+
+<figure class="math-block">
+  <figcaption>{label}</figcaption>
+  <div class="math-render" set:html={html} />
+  <div class="math-explanation">
+    <dl>{symbols.map(item => {
+      const [symbol, ...meaning] = item.split('：');
+      return <div><dt>{symbol}</dt><dd>{meaning.join('：')}</dd></div>;
+    })}</dl>
+    <p><strong>直觉：</strong>{intuition}</p>
+  </div>
+</figure>
