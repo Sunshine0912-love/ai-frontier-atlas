@@ -7,6 +7,7 @@ const required = [
   ['dist/learn/index.html', '四阶段'],
   ['dist/method/index.html', '评分方法'],
   ['dist/learn/kv-cache-to-continuous-batching/index.html', '动手实验'],
+  ['dist/learn/transformer-attention-tensors-complexity/index.html', '注意力的张量'],
   ['dist/learn/preference-alignment-from-rlhf-to-dpo/index.html', '偏好对齐'],
   ['dist/learn/clip-contrastive-multimodal-learning/index.html', '对比学习'],
   ['dist/learn/holistic-llm-evaluation/index.html', '整体评测']

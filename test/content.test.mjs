@@ -69,13 +69,16 @@ test('six learning tracks form a staged curriculum', () => {
 test('every track publishes its complete ordered syllabus', () => {
   const tracks = readJson('src/data/tracks.json');
   const syllabus = readJson('src/data/syllabus.json');
+  const lessons = readJson('src/data/lessons.json');
   for (const track of tracks) {
     const items = syllabus.filter(item => item.track === track.id);
+    const availableLessons = lessons.filter(lesson => lesson.track === track.id);
     assert.equal(items.length, track.plannedLessons, `${track.id} syllabus is incomplete`);
     assert.deepEqual(items.map(item => item.order), Array.from({ length: track.plannedLessons }, (_, index) => index + 1));
     assert.ok(items.every(item => item.title.length >= 6 && item.focus.length >= 18));
     assert.ok(items.every(item => ['available', 'planned'].includes(item.status)));
-    assert.equal(items.filter(item => item.status === 'available').length, 1);
+    assert.equal(items.filter(item => item.status === 'available').length, availableLessons.length);
+    assert.ok(items.filter(item => item.status === 'available').every(item => item.slug));
   }
 });
 

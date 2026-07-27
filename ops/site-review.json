@@ -1,19 +1,19 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-27T08:13:53.211Z",
+  "generatedAt": "2026-07-27T13:07:12.884Z",
   "summary": {
     "frontierItems": 4,
-    "lessons": 6,
+    "lessons": 7,
     "tracks": 6,
     "latestFrontierDate": "2026-07-24",
     "latestLessonDate": "2026-07-27"
   },
   "quality": {
     "frontierScoreCoverage": "4/4",
-    "deepLessonCoverage": "6/6",
-    "researchArticleCoverage": "6/6",
+    "deepLessonCoverage": "7/7",
+    "researchArticleCoverage": "7/7",
     "syllabusCoverage": "6/6",
-    "directReferences": 22
+    "directReferences": 26
   },
   "categoryCoverage": {
     "模型架构": 1,
@@ -25,9 +25,9 @@
     {
       "id": "foundation",
       "title": "基础模型",
-      "lessons": 1,
+      "lessons": 2,
       "planned": 8,
-      "readiness": "1/8",
+      "readiness": "2/8",
       "latest": "2026-07-27",
       "daysSinceLatest": 0
     },

@@ -69,6 +69,83 @@
     "takeaways":["始终区分总参数、激活参数与墙钟成本。","以 token 的完整数据路径分析 MoE，而不是只看专家 GEMM。","同时监控质量、容量溢出和专家负载尾部。","只有在真实拓扑和工作负载上测量，才能判断 MoE 是否值得。"]
   },
   {
+    "slug": "transformer-attention-tensors-complexity",
+    "chapters": [
+      {
+        "id": "problem",
+        "title": "问题设定：序列里的每个 token 如何选择上下文",
+        "paragraphs": [
+          "Transformer 的核心问题不是把序列按固定窗口卷过去，也不是让隐藏状态按时间递推，而是让每个 token 在一次层计算中直接查看所有允许查看的位置。Vaswani 等人在 2017 年提出的 scaled dot-product attention 把这个问题写成三个对象：query 表示当前位置想问什么，key 表示每个位置可被匹配的索引，value 表示真正被聚合的信息。[1] 这个机制让远距离 token 可以在一个 attention layer 内建立路径，同时也把序列长度 S 带入了二次复杂度。",
+          "学习注意力最容易犯的错是只背公式，不跟张量走。对工程师更有用的理解是：输入 [B,S,d_model] 经过三组线性投影后变成 [B,H,S,D]，每个 head 内部都要形成 [S,S] 的分数矩阵。这个矩阵的行是 query 位置，列是 key 位置；mask、softmax、dropout 和 value 聚合都围绕它发生。后续 RoPE、KV Cache、FlashAttention、长上下文稀疏化和多查询注意力，都是在这个基础数据路径上改动某个环节。"
+        ]
+      },
+      {
+        "id": "baseline",
+        "title": "基线：RNN、卷积与全连接混合的取舍",
+        "paragraphs": [
+          "在 Transformer 之前，序列模型常用 RNN 或卷积建立上下文。RNN 的优点是状态随时间递推，长序列内存占用线性，但远距离依赖需要经过很多步传播，训练并行度也受限制。卷积可以并行处理位置，局部模式强，但感受野需要堆叠层数或使用扩张卷积才能覆盖远距离。注意力把任意两点的路径长度压到 1，因此更适合并行训练和全局依赖建模。",
+          "代价也很明确：如果每个位置都与每个位置交互，分数矩阵就是 S×S。短序列上这很划算，因为矩阵乘法规则、并行度高，GPU 易于吃满；长序列上，保存或反复读取注意力中间结果会吞掉显存带宽。判断一种 attention 变体是否有价值，不能只看是否保留全局信息，还要看它怎样改变计算图、内存访问和 mask 语义。"
+        ]
+      },
+      {
+        "id": "qkv",
+        "title": "Q/K/V 投影：同一输入的三种视角",
+        "paragraphs": [
+          "给定输入 X，标准自注意力用 W_Q、W_K、W_V 三个权重矩阵生成 Q、K、V。它们通常来自同一个 X，因此叫 self-attention；交叉注意力则让 query 来自解码器状态，key/value 来自编码器或外部上下文。多头注意力会把 d_model 拆成 H 个 head，每个 head 的维度 D=d_model/H。实现中常把三次投影合并为一次大线性层，再切分最后一维，以减少 kernel launch 和内存读写。",
+          "Q 和 K 的点积不是在比较 token id，而是在比较投影后的特征方向。一个 head 可以学习句法关系，另一个 head 可以学习局部邻近或复制模式，但这只是事后解释，不应把 head 直接等同于固定语义模块。工程阅读源码时，关键是确认 reshape 和 transpose 后的约定：有的库使用 [B,H,S,D]，有的中间 kernel 使用 [S,B,H,D] 或 packed layout。维度顺序错了，模型可能不会立刻报错，却会把 batch、head 或 sequence 混在一起。"
+        ]
+      },
+      {
+        "id": "scores",
+        "title": "分数、缩放与 mask：正确性藏在细节里",
+        "paragraphs": [
+          "每个 head 计算 QK^T 得到 [B,H,S_q,S_k] 分数。除以 √D 的作用是控制点积方差，避免 D 较大时 softmax 进入极端饱和区，梯度集中在少数位置。随后加入 mask：causal mask 阻止位置 i 看见未来位置 j>i，padding mask 阻止模型关注填充 token。两者目标不同，经常会在同一层叠加。把 mask 方向写反，会在训练时泄漏未来 token，或在推理时让当前 token 看不到历史。",
+          "Softmax 的归一化轴必须是 key 维，也就是每个 query 对所有可见 key 的权重和为 1。数值实现通常先在每行减去最大值，再指数化和归一化，避免溢出。PyTorch 的 `scaled_dot_product_attention` 文档把这个流程写成等价 Python，并在实际执行时根据输入、mask、dropout、causal 标志和硬件选择 math、memory-efficient 或 FlashAttention 类后端。[2] 因此调试时不能只看高层 API，还要记录实际启用的 kernel 和 dtype。"
+        ]
+      },
+      {
+        "id": "example",
+        "title": "最小例子：1 个 head、3 个 token 的手算路径",
+        "paragraphs": [
+          "设一个 batch 中有 3 个 token，单 head 维度 D=2。Q、K、V 形状都是 [1,1,3,2]。QK^T 产生 [1,1,3,3]，第 2 行表示第 2 个 token 对三个 key 的原始匹配分。若是因果语言模型，第 2 个 token 可以看第 1、2 个位置，不能看第 3 个位置；于是第 2 行第 3 列被加上一个极小值，softmax 后权重近似为 0。最后这一行权重乘以 V 的三行，得到第 2 个 token 的上下文向量。",
+          "这个小例子可以暴露三个常见错误。第一，mask 用 0/1 乘法而不是加性负无穷时，softmax 仍会给被屏蔽位置分配概率。第二，softmax 轴选成 query 维，会让“所有 query 对同一个 key”归一化，语义完全错位。第三，忘记按 √D 缩放，小模型可能还能跑，大维度下注意力会过早变尖，训练稳定性变差。手写单元测试应固定 Q/K/V 数值，直接断言被 mask 的列权重接近 0。"
+        ]
+      },
+      {
+        "id": "complexity",
+        "title": "复杂度：FLOPs、显存和 IO 不是同一件事",
+        "paragraphs": [
+          "标准注意力的两次主要矩阵乘法是 QK^T 和 P V，其中 P 是 softmax 后权重。若 B 为 batch，H 为 head 数，S 为序列长度，D 为 head 维度，核心计算量约为 O(B·H·S^2·D)。显式保存分数或权重需要 O(B·H·S^2) 中间显存。序列长度翻倍时，注意力关系数量变成四倍，而 Q/K/V 投影和 FFN 主要随 S 线性增长，这就是长上下文首先压到注意力路径的原因。",
+          "但现代 GPU 上性能不只由 FLOPs 决定。朴素实现会把 S×S 分数矩阵写入 HBM，再读回做 softmax，再写回权重，再读回乘 V。FlashAttention 的贡献之一是用分块和在线 softmax 避免完整注意力矩阵反复落到 HBM，在保持精确 attention 结果的同时降低 IO 复杂度。[3] 这不改变数学定义，也不让标准注意力摆脱 S^2 的关系数量；它优化的是内存访问路径。"
+        ]
+      },
+      {
+        "id": "implementation",
+        "title": "源码阅读：从模块接口到 kernel 选择",
+        "paragraphs": [
+          "读实现时先从模型 attention 模块入口开始，找到 q_proj、k_proj、v_proj 和 out_proj。记录输入是否已经带位置编码，Q/K 是否使用 grouped-query 或 multi-query 共享，mask 是布尔张量还是加性 bias。接着跟踪 reshape_heads：很多 bug 都来自 view/transpose 后没有 contiguous，或把 [B,S,H,D] 误传给要求 [B,H,S,D] 的 kernel。最后定位 SDPA 调用，确认 dropout 在训练和推理模式下是否一致。",
+          "PyTorch 的 functional 源码和文档说明了 `is_causal`、`attn_mask`、`dropout_p`、`enable_gqa` 等参数的语义。[2][4] 在生产 profiler 里，应分开记录 QKV projection、attention kernel、out projection、mask 构造和 layout 转换。若 attention kernel 很快但端到端慢，瓶颈可能在不必要的转置、mask materialization 或 KV Cache 读写；若输出偶发 NaN，应先查 dtype、scale、mask 是否产生全负无穷行。"
+        ]
+      },
+      {
+        "id": "boundaries",
+        "title": "边界：注意力不是通用解释器",
+        "paragraphs": [
+          "Attention weights 看起来像解释，但不能直接等同于因果重要性。权重表示当前层当前 head 的 value 聚合比例，后面还有输出投影、残差、归一化和 FFN。一个 token 对另一个 token 权重高，不代表最终预测一定依赖它；权重低也不代表信息没有通过其他 head 或层传播。用注意力图解释模型时，必须把它当成诊断线索，而不是最终证据。",
+          "工程上也不能把标准全注意力当成所有场景的默认答案。短上下文、训练并行和高质量基线适合标准 attention；超长上下文、低延迟推理或边缘部署可能需要 FlashAttention、GQA/MQA、稀疏注意力、滑动窗口或状态空间替代。选择时要先固定任务质量和可见上下文语义，再比较吞吐、显存、延迟、实现复杂度和失败边界。"
+        ]
+      }
+    ],
+    "formulas": [
+      {"afterChapter":"scores","label":"缩放点积注意力","latex":"\\operatorname{Attention}(Q,K,V)=\\operatorname{softmax}\\left(\\frac{QK^\\top}{\\sqrt{D}}+M\\right)V","symbols":["Q：query 张量","K：key 张量","V：value 张量","D：head dimension","M：causal 或 padding mask"],"intuition":"QK^T 产生每个 query 对所有 key 的匹配分；缩放控制数值范围，mask 删除非法位置，softmax 权重再聚合 value。"},
+      {"afterChapter":"complexity","label":"标准注意力主复杂度","latex":"\\operatorname{Cost}\\approx O(B\\cdot H\\cdot S^2\\cdot D),\\quad \\operatorname{Memory}_{scores}=O(B\\cdot H\\cdot S^2)","symbols":["B：batch size","H：head 数","S：序列长度","D：每个 head 的维度"],"intuition":"关系矩阵按 token 两两组合增长；长上下文会让注意力分数和权重先于线性投影成为主要瓶颈。"}
+    ],
+    "workedExample":{"title":"用固定 Q/K/V 审计 mask 和 softmax 轴","steps":["构造 B=1、H=1、S=3、D=2 的 Q/K/V，并手算 QK^T/√D。","加入 causal mask，检查第 1 个 token 只能关注自己，第 2 个 token 不能关注第 3 个 token。","改变 softmax 轴或 mask 方向，观察输出如何偏离 PyTorch SDPA。"],"result":"正确输出形状为 [1,1,3,2]；每一行注意力权重在可见 key 上归一化，被屏蔽位置权重接近 0。"},
+    "implementationMap":[{"concept":"线性投影","code":"q_proj/k_proj/v_proj or fused qkv","note":"确认权重形状、bias 和是否共享 K/V head。"},{"concept":"张量布局","code":"view → transpose → [B,H,S,D]","note":"记录 contiguous、stride 和 kernel 要求。"},{"concept":"注意力核心","code":"scaled_dot_product_attention(q,k,v,attn_mask,is_causal)","note":"区分 causal、padding、dropout 和后端选择。"},{"concept":"输出合并","code":"transpose → merge heads → out_proj","note":"验证输出回到 [B,S,d_model] 并进入残差路径。"}],
+    "limitations":["显式 attention weights 不能直接当作因果解释。","标准注意力的关系数量随序列长度二次增长。","mask 语义在不同库中可能使用布尔或加性 bias，迁移时容易写反。","Fused kernel 优化 IO，但会让逐元素调试和权重可视化变困难。"],
+    "takeaways":["按 Q/K/V、scores、mask、softmax、V 聚合的顺序读注意力。","每一步都写下 [B,H,S,D] 或 [B,H,S,S]，形状比口号可靠。","长上下文瓶颈来自计算、显存和 HBM IO 的共同作用。","生产中优先使用经过验证的 SDPA kernel，同时保留小规模显式实现做正确性测试。"]
+  },
+  {
     "slug": "clip-contrastive-multimodal-learning",
     "chapters": [
       {

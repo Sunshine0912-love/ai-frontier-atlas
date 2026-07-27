@@ -36,6 +36,43 @@
     ]
   },
   {
+    "slug": "transformer-attention-tensors-complexity",
+    "track": "foundation",
+    "order": 2,
+    "updatedAt": "2026-07-27",
+    "title": "Transformer：注意力的张量与复杂度",
+    "description": "从 Q/K/V 投影、mask、softmax 和输出投影推导标准自注意力，建立读懂后续长上下文与推理优化的共同坐标。",
+    "difficulty": "进阶",
+    "duration": "80 分钟",
+    "objectives": ["写出 scaled dot-product attention 的完整张量形状", "解释 causal mask、padding mask 与 softmax 归一化轴", "估算注意力的计算、显存和 IO 复杂度"],
+    "prerequisites": ["矩阵乘法与 softmax", "批量张量形状", "基本 GPU 显存层级"],
+    "keyTerms": ["Q/K/V", "scaled dot-product attention", "causal mask", "multi-head attention", "SDPA"],
+    "conceptMap": ["Attention 先把每个 token 投影成 query、key、value，再用 query-key 相似度决定从 value 中聚合什么信息。", "Multi-head attention 把隐藏维度切成多个子空间，使不同 head 可以学习不同关系，但最终仍回到同一隐藏维度。", "标准注意力的算术复杂度和注意力矩阵显存随序列长度二次增长，后续长上下文与推理优化都在处理这个瓶颈。"],
+    "mentalModel": "把注意力想成一次可微的查表：query 是当前 token 提出的问题，key 是所有可见 token 的索引，value 是真正被取回的内容。分数矩阵回答“每个问题应该看哪些索引”，softmax 把它变成权重，最后用权重对内容加权求和。工程上最贵的不是概念，而是为每个 query 和每个 key 都建立关系。",
+    "mechanism": ["输入 X∈R^(B×S×d_model) 分别乘以 W_Q、W_K、W_V，得到 Q/K/V，并 reshape 为 [B,H,S,D]。", "对每个 head 计算 QK^T/√D，加入 causal 或 padding mask 后沿 key 维做 softmax，得到 [B,H,S,S] 注意力权重。", "权重乘以 V 得到每个 head 的上下文，再 concat heads 并经过输出投影回到 [B,S,d_model]。"],
+    "codePath": ["从 nn.MultiheadAttention 或模型 attention 模块找到 q_proj、k_proj、v_proj 与 out_proj。", "核对 transpose/reshape 后的 [batch, heads, sequence, head_dim] 约定，再定位 scaled_dot_product_attention 调用。", "在 profiler 中分开 QKV projection、attention kernel、输出投影和 dropout/mask 开销。"],
+    "tensorFlow": ["X [B,S,d] → Q/K/V [B,H,S,D] → scores [B,H,S,S] → weights [B,H,S,S]", "weights @ V [B,H,S,D] → transpose/concat [B,S,H·D] → out_proj [B,S,d]"],
+    "pseudocode": ["q = reshape_heads(x @ W_q)", "k = reshape_heads(x @ W_k)", "v = reshape_heads(x @ W_v)", "scores = (q @ k.transpose(-2, -1)) / sqrt(head_dim)", "scores = scores + attention_mask", "weights = softmax(scores, dim=-1)", "context = weights @ v", "return out_proj(merge_heads(context))"],
+    "engineeringMeaning": ["注意力的 O(S^2) 关系矩阵让长上下文首先变成显存和带宽问题，而不仅是 FLOPs 问题。", "实现中 mask 语义、张量布局和 kernel 选择会直接影响正确性、吞吐和数值稳定性。"],
+    "decisionTable": [
+      { "condition": "教学、调试或短序列", "choose": "显式计算 scores 和 weights", "because": "最容易检查 mask、归一化轴和每个 head 的行为" },
+      { "condition": "生产训练或推理", "choose": "使用 fused SDPA / FlashAttention 类 kernel", "because": "减少中间矩阵写回和 HBM 读写，通常更快且更省显存" },
+      { "condition": "需要未来 token 不可见", "choose": "使用 causal mask 并写测试覆盖边界 token", "because": "mask 方向错误会造成训练泄漏或推理不一致" }
+    ],
+    "lab": {
+      "title": "手写并审计一个最小自注意力",
+      "steps": ["用 1 个 batch、2 个 head、4 个 token 构造 Q/K/V，打印每个中间张量形状。", "分别加入 causal mask 和 padding mask，验证 softmax 后被屏蔽位置权重接近 0。", "把显式实现与 PyTorch scaled_dot_product_attention 输出对齐，并记录序列长度翻倍时的内存变化。"],
+      "successCriteria": ["能解释每个矩阵乘法的左右维度和输出形状。", "能定位 mask 方向、dtype 或归一化轴错误导致的具体异常。"]
+    },
+    "selfCheck": ["为什么分母要除以 √D，而不是除以序列长度？", "causal mask 与 padding mask 解决的是同一个问题吗？", "标准注意力在长上下文下最先暴露哪些系统瓶颈？"],
+    "sources": [
+      { "label": "Vaswani et al., Attention Is All You Need", "url": "https://arxiv.org/abs/1706.03762", "type": "原始论文" },
+      { "label": "PyTorch scaled_dot_product_attention 官方文档", "url": "https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html", "type": "官方文档" },
+      { "label": "PyTorch torch.nn.functional 官方源码", "url": "https://github.com/pytorch/pytorch/blob/main/torch/nn/functional.py", "type": "官方源码" },
+      { "label": "Dao et al., FlashAttention", "url": "https://arxiv.org/abs/2205.14135", "type": "原始论文" }
+    ]
+  },
+  {
     "slug": "clip-contrastive-multimodal-learning",
     "track": "multimodal",
     "order": 1,
