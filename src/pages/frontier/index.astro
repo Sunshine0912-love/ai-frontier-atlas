@@ -1,37 +1,72 @@
 ---
 import Layout from '../../components/Layout.astro';
-import FrontierCard from '../../components/FrontierCard.astro';
+import SignalRow from '../../components/SignalRow.astro';
 import frontier from '../../data/frontier.json';
+import tracks from '../../data/tracks.json';
 
 const items = [...frontier].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
-const categories = ['全部', ...new Set(items.map(item => item.category))];
+const domains = tracks.filter(track => items.some(item => item.domain === track.id));
 ---
 
-<Layout title="前沿情报流｜AI Frontier Atlas" description="带原始来源、证据等级和不确定性边界的全球 AI 前沿情报。">
-  <section class="page-hero shell compact">
-    <p class="eyebrow"><span class="live-dot"></span> GLOBAL AI FRONTIER</p>
-    <h1>前沿情报流</h1>
-    <p>我们不追踪所有新闻，只记录会改变模型能力、成本结构、开发范式或产业边界的技术信号。</p>
+<Layout title="前沿情报｜AI Frontier Atlas" description="带技术机制、证据边界、可复现性和下一观察点的全球 AI 前沿信号矩阵。">
+  <section class="page-intro shell">
+    <p class="kicker"><span class="status-pulse"></span> FRONTIER INTELLIGENCE</p>
+    <div><h1>前沿情报<br />信号矩阵</h1><p>我们不复述所有新闻。这里只记录可能改变能力边界、成本结构、工程范式或研究方向的变化，并明确哪些仍未被证明。</p></div>
   </section>
-  <section class="shell frontier-toolbar" aria-label="情报筛选">
-    <div class="filter-row">
-      {categories.map((category, index) => <button class:list={{ active: index === 0 }} data-filter={category}>{category}</button>)}
+
+  <section class="filter-console shell" aria-label="情报筛选">
+    <div class="filter-group"><span>研究域</span>
+      <button class="active" data-filter-domain="all">全部</button>
+      {domains.map(track => <button data-filter-domain={track.id}>{track.title}</button>)}
     </div>
-    <p><strong>{items.length}</strong> 条已核实信号 · S/A 级证据</p>
+    <div class="filter-group"><span>来源</span>
+      <button class="active" data-filter-evidence="all">全部</button>
+      <button data-filter-evidence="S">S 级直接来源</button>
+    </div>
+    <p><strong id="visible-count">{items.length}</strong> / {items.length} signals</p>
   </section>
-  <section class="shell intel-grid frontier-list" id="frontier-list">
-    {items.map(item => <FrontierCard item={item} />)}
+
+  <section class="shell intelligence-ledger" data-evidence-filter>
+    <div class="ledger-head">
+      <div><p class="section-code">INTELLIGENCE LEDGER</p><h2>逐条研究记录</h2></div>
+      <div class="score-legend">
+        <span>评分：</span><i>N</i> 新颖性 <i>I</i> 影响 <i>E</i> 证据 <i>R</i> 可复现性
+      </div>
+    </div>
+    {items.map((item, index) => <SignalRow item={item} index={index} detailed />)}
   </section>
+
+  <section class="shell evidence-note">
+    <div><strong>S</strong><span>直接来源</span><p>论文、技术报告、源码、模型卡、官方工程数据。只证明来源明确陈述的范围。</p></div>
+    <div><strong>4D</strong><span>编辑评分</span><p>新颖、影响、证据和复现均为 1–5 分。评分是可修订判断，不是客观测量。</p></div>
+    <div><strong>Δ</strong><span>下一观察点</span><p>每条信号必须说明什么新证据会强化、修正或推翻当前判断。</p></div>
+  </section>
+
   <script is:inline>
-    document.querySelectorAll('[data-filter]').forEach((button) => {
-      button.addEventListener('click', () => {
-        document.querySelectorAll('[data-filter]').forEach((item) => item.classList.remove('active'));
-        button.classList.add('active');
-        const value = button.dataset.filter;
-        document.querySelectorAll('[data-category]').forEach((card) => {
-          card.hidden = value !== '全部' && card.dataset.category !== value;
-        });
+    let domain = 'all';
+    let evidence = 'all';
+    const rows = [...document.querySelectorAll('.signal-row')];
+    const apply = () => {
+      let visible = 0;
+      rows.forEach((row) => {
+        const show = (domain === 'all' || row.dataset.domain === domain)
+          && (evidence === 'all' || row.dataset.evidence === evidence);
+        row.hidden = !show;
+        if (show) visible += 1;
       });
-    });
+      document.querySelector('#visible-count').textContent = visible;
+    };
+    document.querySelectorAll('[data-filter-domain]').forEach((button) => button.addEventListener('click', () => {
+      document.querySelectorAll('[data-filter-domain]').forEach(item => item.classList.remove('active'));
+      button.classList.add('active');
+      domain = button.dataset.filterDomain;
+      apply();
+    }));
+    document.querySelectorAll('[data-filter-evidence]').forEach((button) => button.addEventListener('click', () => {
+      document.querySelectorAll('[data-filter-evidence]').forEach(item => item.classList.remove('active'));
+      button.classList.add('active');
+      evidence = button.dataset.filterEvidence;
+      apply();
+    }));
   </script>
 </Layout>

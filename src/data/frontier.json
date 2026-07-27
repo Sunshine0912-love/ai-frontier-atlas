@@ -2,61 +2,85 @@
   {
     "slug": "kimi-k3-open-frontier-intelligence",
     "publishedAt": "2026-07-24",
-    "category": "模型",
-    "title": "Kimi K3 把开放模型推进到 3T 级与百万上下文",
-    "summary": "Kimi 发布 2.8T 参数、原生视觉、1M 上下文的 K3，并把 Kimi Delta Attention 与 Attention Residuals 作为架构主轴。",
-    "fact": "官方技术博客披露 2.8T 参数、1M 上下文、16/896 专家激活，以及 KDA、AttnRes 和原生视觉能力。",
-    "impact": "开放权重模型的竞争正在从单纯参数规模转向长上下文状态、稀疏专家和部署系统的共同设计。",
-    "uncertainty": "完整技术报告和权重发布细节仍决定外部团队能否复现其训练与推理效率。",
+    "category": "模型架构",
+    "domain": "foundation",
+    "stage": "已发布 · 待外部复现",
+    "organization": "Moonshot AI",
+    "title": "Kimi K3 将开放模型推进到 2.8T 参数与百万上下文",
+    "summary": "K3 把超大规模稀疏专家、长上下文注意力和原生视觉放进同一开放模型设计，竞争焦点从参数规模转向架构—系统协同。",
+    "fact": "官方技术博客披露 2.8T 总参数、每 token 激活 16/896 个专家、1M 上下文，并介绍 Kimi Delta Attention、Attention Residuals 与原生视觉能力。",
+    "mechanism": "KDA 试图降低长上下文注意力的状态与计算成本，稀疏 MoE 将总容量和每 token 计算解耦；AttnRes 则重新设计残差路径。三者共同决定模型能否在超长上下文下保持容量、稳定性与可服务性。",
+    "impact": "开放权重模型的竞争正在从单纯参数规模转向长上下文状态、稀疏专家通信和部署系统的共同设计。",
+    "uncertainty": "当前关键数字来自开发方披露。完整技术报告、权重许可、训练配方与第三方同预算评测仍决定外部团队能否复现其质量和效率。",
+    "watchNext": "跟踪技术报告、开放权重与推理代码；重点核对百万上下文下的有效信息利用、KV/状态成本以及非官方硬件上的吞吐。",
     "evidenceLevel": "S",
+    "scores": { "novelty": 5, "impact": 5, "evidence": 4, "reproducibility": 2 },
     "tags": ["Open Model", "Long Context", "MoE"],
     "sources": [
-      { "label": "Kimi 官方技术博客", "url": "https://www.kimi.com/blog/kimi-k3", "type": "官方博客" }
+      { "label": "Kimi 官方技术博客", "url": "https://www.kimi.com/blog/kimi-k3", "type": "官方技术说明", "direct": true }
     ]
   },
   {
     "slug": "claude-opus-5-release",
     "publishedAt": "2026-07-24",
-    "category": "模型",
-    "title": "Anthropic 发布 Claude Opus 5，前沿能力进入成本重排",
-    "summary": "Claude Opus 5 以接近更高阶模型的能力和更低价格进入全平台，模型选择开始更多由任务经济性决定。",
-    "fact": "Anthropic 宣布 Claude Opus 5 已上线 API 与各平台，价格为每百万输入 token 5 美元、输出 token 25 美元。",
-    "impact": "前沿模型的价值判断会从单榜单分数转向单位成本、长任务可靠性和可控推理预算。",
-    "uncertainty": "官方发布信息不足以独立证明所有真实工作负载上的能力—价格优势，需要第三方、同预算评测。",
+    "category": "模型经济性",
+    "domain": "evaluation",
+    "stage": "已发布 · 需同预算评测",
+    "organization": "Anthropic",
+    "title": "Claude Opus 5 让前沿模型比较进入成本—可靠性重排",
+    "summary": "能力、价格与长任务可靠性开始被放进同一决策函数，单一榜单分数对生产模型选择的解释力继续下降。",
+    "fact": "Anthropic 宣布 Claude Opus 5 已上线 API 与各平台，公开价格为每百万输入 token 5 美元、输出 token 25 美元。",
+    "mechanism": "生产模型的真实效用由任务成功率、重试次数、上下文长度、工具调用成本和人工复核共同决定。更低 token 单价只有在相同任务成功标准下，才会转化为更低的端到端成本。",
+    "impact": "模型评测需要从静态能力榜单扩展到单位成功任务成本、长任务可靠性、可控推理预算和失败恢复。",
+    "uncertainty": "官方发布信息不能独立证明所有真实工作负载上的能力—价格优势；缺少公开权重也限制了机制层面的外部审计。",
+    "watchNext": "建立同一工具集、同一任务集和同一成功标准下的对照评测，记录成功率、token、延迟、重试和人工介入，而非只比较输出观感。",
     "evidenceLevel": "S",
-    "tags": ["Frontier Model", "Economics", "API"],
+    "scores": { "novelty": 3, "impact": 4, "evidence": 3, "reproducibility": 1 },
+    "tags": ["Frontier Model", "Economics", "Evaluation"],
     "sources": [
-      { "label": "Anthropic 官方发布", "url": "https://www.anthropic.com/news/claude-opus-5", "type": "官方博客" }
+      { "label": "Anthropic 官方发布", "url": "https://www.anthropic.com/news/claude-opus-5", "type": "官方发布", "direct": true }
     ]
   },
   {
     "slug": "llm-d-cooperative-time-slicing-rl",
     "publishedAt": "2026-07-23",
-    "category": "AI Infra",
+    "category": "训练基础设施",
+    "domain": "training",
+    "stage": "工程发布 · 有组件",
+    "organization": "Google Cloud / llm-d",
     "title": "llm-d 用协作式时间切片填补 Agentic RL 的 GPU 空洞",
-    "summary": "Google Cloud 在 llm-d 中把 rollout 与训练阶段变成可调度单元，让不同 RL 作业交错利用同一批加速器。",
-    "fact": "官方文章报告聚合加速器利用率从约 40% 提升到 70%，并公开 Snapshot Agent、调度器和客户端组件。",
-    "impact": "Agentic RL 的瓶颈不只在算法和显存，也在采样—训练交替造成的结构性空闲；调度层开始进入优化主战场。",
-    "uncertainty": "收益依赖作业互补性、快照恢复成本与隔离机制，跨硬件和大规模生产稳定性仍待验证。",
+    "summary": "把 rollout 与训练阶段变成可调度单元，让不同 RL 作业交错利用同一批加速器，暴露出 Agentic RL 的系统瓶颈。",
+    "fact": "Google Cloud 工程文章报告聚合加速器利用率从约 40% 提升到 70%，并介绍 Snapshot Agent、调度器和客户端组件。",
+    "mechanism": "Agentic RL 的采样与训练阶段对 GPU、CPU 和网络的需求不同，串行执行会形成周期性空闲。协作式时间切片在阶段边界创建可恢复快照，由调度器把互补作业交错放置，并尽量隐藏保存与恢复成本。",
+    "impact": "Agentic RL 的优化主战场从算法和显存扩展到跨作业调度、快照恢复、故障隔离与集群利用率。",
+    "uncertainty": "收益依赖作业互补性、快照大小、恢复延迟与隔离机制；官方示例不能直接外推到所有模型规模和集群拓扑。",
+    "watchNext": "关注公开基准、快照开销分解、跨节点稳定性和失败恢复；复现时必须同时记录利用率、样本吞吐、训练墙钟时间和任务公平性。",
     "evidenceLevel": "S",
+    "scores": { "novelty": 4, "impact": 5, "evidence": 4, "reproducibility": 4 },
     "tags": ["RL Infra", "GPU Utilization", "Scheduling"],
     "sources": [
-      { "label": "Google Cloud 官方博客", "url": "https://cloud.google.com/blog/products/containers-kubernetes/introducing-co-operative-time-slicing-for-rl-in-llm-d", "type": "官方工程博客" }
+      { "label": "Google Cloud 官方工程博客", "url": "https://cloud.google.com/blog/products/containers-kubernetes/introducing-co-operative-time-slicing-for-rl-in-llm-d", "type": "官方工程博客", "direct": true }
     ]
   },
   {
     "slug": "amd-instella-moe-open-stack",
     "publishedAt": "2026-07-24",
-    "category": "开放生态",
-    "title": "AMD 用 Instella-MoE 展示全开放 MoE 训练栈",
-    "summary": "Instella-MoE 公开 16B 总参数、2.8B 激活参数模型的多阶段权重、配置、数据混合与代码。",
-    "fact": "AMD 官方说明模型在 MI300X/MI325X 与 ROCm 栈上从头训练，并包含 Gated MLA、FarSkip-Collective 和 64K 长上下文阶段。",
-    "impact": "开放模型的价值开始从最终权重扩展到训练轨迹、硬件栈与通信优化的可复现性。",
-    "uncertainty": "技术报告尚未发布，性能结论当前主要来自开发方披露；跨硬件复现成本仍不明确。",
+    "category": "开放训练栈",
+    "domain": "training",
+    "stage": "开放发布 · 可检查产物",
+    "organization": "AMD",
+    "title": "Instella-MoE 将开放价值从权重扩展到训练轨迹与硬件栈",
+    "summary": "多阶段权重、配置、数据混合与代码一起公开，使模型产物开始承担可审计训练系统的角色。",
+    "fact": "AMD 说明 16B 总参数、2.8B 激活参数的 Instella-MoE 在 MI300X/MI325X 与 ROCm 栈上从头训练，并包含 Gated MLA、FarSkip-Collective 和 64K 长上下文阶段。",
+    "mechanism": "Gated MLA 控制低秩注意力状态，MoE 稀疏激活降低每 token 计算；FarSkip-Collective 试图改善跨设备通信。多阶段 checkpoint 让外部研究者可以观察训练与长上下文扩展前后的行为变化。",
+    "impact": "开放模型的评估对象从最终 checkpoint 扩展到数据配方、训练轨迹、通信优化和特定硬件上的端到端效率。",
+    "uncertainty": "完整技术报告尚未发布，性能结论主要来自开发方披露；跨硬件移植的性能与工程成本仍需独立测量。",
+    "watchNext": "核对技术报告和许可证；在不同 ROCm/CUDA 环境复现吞吐、专家负载、通信占比和长上下文质量。",
     "evidenceLevel": "S",
+    "scores": { "novelty": 4, "impact": 4, "evidence": 4, "reproducibility": 5 },
     "tags": ["MoE", "ROCm", "Open Training"],
     "sources": [
-      { "label": "AMD ROCm 官方技术博客", "url": "https://rocm.blogs.amd.com/artificial-intelligence/instella-moe/README.html", "type": "官方工程博客" }
+      { "label": "AMD ROCm 官方技术博客", "url": "https://rocm.blogs.amd.com/artificial-intelligence/instella-moe/README.html", "type": "官方工程博客", "direct": true }
     ]
   }
 ]

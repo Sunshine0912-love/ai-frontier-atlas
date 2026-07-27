@@ -1,0 +1,24 @@
+---
+interface Props { tracks: any[]; lessons: any[]; frontier: any[] }
+const { tracks, lessons, frontier } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<div class="domain-matrix">
+  <div class="matrix-head">
+    <span>研究域</span><span>当前问题</span><span>内容</span><span>状态</span>
+  </div>
+  {tracks.map((track) => {
+    const lessonCount = lessons.filter(lesson => lesson.track === track.id).length;
+    const signalCount = frontier.filter(signal => signal.domain === track.id).length;
+    return (
+      <a class="matrix-row" href={`${base}/learn/#${track.id}`}>
+        <div><span class={`domain-dot dot-${track.color}`}></span><strong>{track.title}</strong><small>{track.stage}</small></div>
+        <p>{track.description}</p>
+        <span>{signalCount} 信号 / {lessonCount} 课程 / {track.labCount} 实验</span>
+        <em class={`status-${track.status}`}>{track.status === 'available' ? '可学习' : '扩展中'}</em>
+      </a>
+    );
+  })}
+</div>
+

@@ -1,0 +1,52 @@
+---
+import ScoreBars from './ScoreBars.astro';
+
+interface Props { item: any; index?: number; detailed?: boolean }
+const { item, index = 0, detailed = false } = Astro.props;
+const trackNames: Record<string, string> = {
+  foundation: '基础模型',
+  training: '训练与对齐',
+  inference: '推理与服务',
+  agent: 'Agent',
+  multimodal: '多模态',
+  evaluation: '评测'
+};
+---
+
+<article
+  class:list={['signal-row', { detailed }]}
+  data-domain={item.domain}
+  data-evidence={item.evidenceLevel}
+>
+  <div class="signal-index">{String(index + 1).padStart(2, '0')}</div>
+  <div class="signal-main">
+    <div class="signal-meta">
+      <time datetime={item.publishedAt}>{item.publishedAt}</time>
+      <span>{trackNames[item.domain] || item.category}</span>
+      <span>{item.organization}</span>
+      <span class="signal-stage">{item.stage}</span>
+    </div>
+    <h3>{item.title}</h3>
+    <p>{item.summary}</p>
+    {detailed && (
+      <div class="signal-analysis">
+        <div><strong>事实</strong><p>{item.fact}</p></div>
+        <div><strong>机制</strong><p>{item.mechanism}</p></div>
+        <div><strong>影响</strong><p>{item.impact}</p></div>
+        <div class="risk"><strong>证据边界</strong><p>{item.uncertainty}</p></div>
+        <div class="watch"><strong>下一观察点</strong><p>{item.watchNext}</p></div>
+      </div>
+    )}
+  </div>
+  <div class="signal-side">
+    <span class={`evidence-level evidence-${item.evidenceLevel.toLowerCase()}`}>{item.evidenceLevel} 级来源</span>
+    <ScoreBars scores={item.scores} compact={!detailed} />
+    <div class="signal-tags">{item.tags.map((tag: string) => <span>{tag}</span>)}</div>
+    <div class="signal-sources">
+      {item.sources.map((source: any) => (
+        <a href={source.url} target="_blank" rel="noreferrer">{source.label}<span aria-hidden="true">↗</span></a>
+      ))}
+    </div>
+  </div>
+</article>
+

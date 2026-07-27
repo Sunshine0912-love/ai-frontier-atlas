@@ -1,37 +1,58 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-27T06:57:33.212Z",
+  "generatedAt": "2026-07-27T07:43:44.561Z",
   "summary": {
     "frontierItems": 4,
-    "lessons": 3,
+    "lessons": 6,
     "tracks": 6,
     "latestFrontierDate": "2026-07-24",
     "latestLessonDate": "2026-07-27"
   },
+  "quality": {
+    "frontierScoreCoverage": "4/4",
+    "deepLessonCoverage": "6/6",
+    "directReferences": 16
+  },
   "categoryCoverage": {
-    "模型": 2,
-    "AI Infra": 1,
-    "开放生态": 1
+    "模型架构": 1,
+    "模型经济性": 1,
+    "训练基础设施": 1,
+    "开放训练栈": 1
   },
   "trackCoverage": [
     {
       "id": "foundation",
       "title": "基础模型",
       "lessons": 1,
+      "planned": 8,
+      "readiness": "1/8",
+      "latest": "2026-07-27",
+      "daysSinceLatest": 0
+    },
+    {
+      "id": "multimodal",
+      "title": "多模态表示",
+      "lessons": 1,
+      "planned": 6,
+      "readiness": "1/6",
       "latest": "2026-07-27",
       "daysSinceLatest": 0
     },
     {
       "id": "training",
       "title": "训练与对齐",
-      "lessons": 0,
-      "latest": "",
-      "daysSinceLatest": null
+      "lessons": 1,
+      "planned": 9,
+      "readiness": "1/9",
+      "latest": "2026-07-27",
+      "daysSinceLatest": 0
     },
     {
       "id": "inference",
       "title": "推理与服务",
       "lessons": 1,
+      "planned": 8,
+      "readiness": "1/8",
       "latest": "2026-07-27",
       "daysSinceLatest": 0
     },
@@ -39,58 +60,51 @@
       "id": "agent",
       "title": "Agent 系统",
       "lessons": 1,
+      "planned": 8,
+      "readiness": "1/8",
       "latest": "2026-07-27",
       "daysSinceLatest": 0
     },
     {
-      "id": "multimodal",
-      "title": "多模态",
-      "lessons": 0,
-      "latest": "",
-      "daysSinceLatest": null
-    },
-    {
       "id": "evaluation",
       "title": "评测与安全",
-      "lessons": 0,
-      "latest": "",
-      "daysSinceLatest": null
+      "lessons": 1,
+      "planned": 7,
+      "readiness": "1/7",
+      "latest": "2026-07-27",
+      "daysSinceLatest": 0
     }
   ],
   "recentFrontier": [
     {
       "slug": "kimi-k3-open-frontier-intelligence",
-      "title": "Kimi K3 把开放模型推进到 3T 级与百万上下文",
+      "title": "Kimi K3 将开放模型推进到 2.8T 参数与百万上下文",
       "publishedAt": "2026-07-24",
-      "category": "模型",
+      "category": "模型架构",
       "evidenceLevel": "S"
     },
     {
       "slug": "claude-opus-5-release",
-      "title": "Anthropic 发布 Claude Opus 5，前沿能力进入成本重排",
+      "title": "Claude Opus 5 让前沿模型比较进入成本—可靠性重排",
       "publishedAt": "2026-07-24",
-      "category": "模型",
+      "category": "模型经济性",
       "evidenceLevel": "S"
     },
     {
       "slug": "amd-instella-moe-open-stack",
-      "title": "AMD 用 Instella-MoE 展示全开放 MoE 训练栈",
+      "title": "Instella-MoE 将开放价值从权重扩展到训练轨迹与硬件栈",
       "publishedAt": "2026-07-24",
-      "category": "开放生态",
+      "category": "开放训练栈",
       "evidenceLevel": "S"
     },
     {
       "slug": "llm-d-cooperative-time-slicing-rl",
       "title": "llm-d 用协作式时间切片填补 Agentic RL 的 GPU 空洞",
       "publishedAt": "2026-07-23",
-      "category": "AI Infra",
+      "category": "训练基础设施",
       "evidenceLevel": "S"
     }
   ],
-  "gaps": [
-    "「训练与对齐」路线尚无课程，应先补齐核心入门节点。",
-    "「多模态」路线尚无课程，应先补齐核心入门节点。",
-    "「评测与安全」路线尚无课程，应先补齐核心入门节点。"
-  ],
-  "nextDirection": "「训练与对齐」路线尚无课程，应先补齐核心入门节点。"
+  "gaps": [],
+  "nextDirection": "复查最薄路线，并优先选择有一手来源的新内容。"
 }

@@ -2,11 +2,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const required = [
-  ['dist/index.html', '追踪 AI 前沿'],
-  ['dist/frontier/index.html', '前沿情报流'],
-  ['dist/learn/index.html', '系统学习路径'],
-  ['dist/method/index.html', '来源与方法'],
-  ['dist/learn/kv-cache-to-continuous-batching/index.html', '从 KV Cache 到 Continuous Batching']
+  ['dist/index.html', '研究工作台'],
+  ['dist/frontier/index.html', '信号矩阵'],
+  ['dist/learn/index.html', '四阶段'],
+  ['dist/method/index.html', '评分方法'],
+  ['dist/learn/kv-cache-to-continuous-batching/index.html', '动手实验'],
+  ['dist/learn/preference-alignment-from-rlhf-to-dpo/index.html', '偏好对齐'],
+  ['dist/learn/clip-contrastive-multimodal-learning/index.html', '对比学习'],
+  ['dist/learn/holistic-llm-evaluation/index.html', '整体评测']
 ];
 
 for (const [file, marker] of required) {
