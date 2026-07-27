@@ -1,35 +1,142 @@
 [
   {
+    "slug": "moe-from-routing-to-all-to-all",
+    "track": "foundation",
+    "order": 1,
+    "updatedAt": "2026-07-27",
+    "title": "MoE：从路由公式到 All-to-All 瓶颈",
+    "description": "沿 token 的完整数据路径，理解稀疏专家如何节省计算，又为何把压力转移到负载均衡和跨卡通信。",
+    "difficulty": "进阶",
+    "duration": "70 分钟",
+    "objectives": ["写出 top-k router 与专家聚合的核心计算", "沿张量形状解释 dispatch 和 combine", "判断 MoE 何时不会带来墙钟时间收益"],
+    "prerequisites": ["Transformer 前馈网络", "数据并行与张量并行基础"],
+    "keyTerms": ["router logits", "top-k", "capacity factor", "expert parallel", "All-to-All"],
+    "conceptMap": ["Router 为每个 token 选择少量专家，使总参数和每 token 激活参数解耦。", "Expert Parallel 把专家放在不同设备，token 必须经历 dispatch、All-to-All、expert MLP 和 combine。", "容量因子、辅助损失和专家放置共同决定丢 token、负载、通信和质量。"],
+    "mentalModel": "把 MoE 想成一个跨机房分诊系统：router 是分诊台，专家是专科医生。增加医生数量提升总容量，但每位患者只去少数科室。真正的瓶颈可能不是诊疗计算，而是患者在楼层之间移动、热门科室排队以及空闲科室无法分担负载。",
+    "mechanism": ["输入 X∈R^(B·S×d) 经过线性 router 得到每个 token 对 E 个专家的 logits。", "top-k 产生专家索引与归一化权重；dispatch 按专家重排 token，并通过 All-to-All 送到专家所在设备。", "每个专家执行独立 MLP，combine 按路由权重恢复原 token 顺序；辅助损失约束专家负载。"],
+    "codePath": ["从 router logits → top-k → token counts 查看负载分布。", "沿 dispatch buffer 和 expert parallel group 找到第一次 All-to-All。", "在 expert MLP 前后记录通信等待、GEMM 时间和 combine 开销。"],
+    "tensorFlow": ["[B,S,d] → flatten [T,d] → router [T,E] → top-k indices/weights [T,k]", "dispatch [T,d] → per-expert [E,C,d] → expert MLP [E,C,d] → combine [T,d]"],
+    "pseudocode": ["logits = router(x)", "weight, expert = topk(softmax(logits), k)", "packed, metadata = dispatch(x, expert, capacity)", "remote = all_to_all(packed, expert_group)", "expert_out = expert_mlp(remote)", "return combine(all_to_all(expert_out), weight, metadata)"],
+    "engineeringMeaning": ["MoE 的 FLOPs 优势不会自动变成 wall-clock 优势；网络拓扑和尾部专家会成为主瓶颈。", "优化目标应从单 GPU 峰值算力扩展到每卡、每瓦、每机架的有效 token，以及 P95 专家负载。"],
+    "decisionTable": [
+      { "condition": "单机高速互联、专家负载稳定", "choose": "提高 expert parallel 并重叠通信", "because": "可以把稀疏计算优势转成更高吞吐" },
+      { "condition": "跨节点网络弱、热门专家明显", "choose": "分组路由或减少跨节点专家跨度", "because": "降低 All-to-All 尾延迟和拥塞" },
+      { "condition": "质量敏感且频繁丢 token", "choose": "提高容量因子并调节负载损失", "because": "以显存和计算换取更稳定路由" }
+    ],
+    "lab": {
+      "title": "测量一个简化 MoE 的负载与通信代价",
+      "steps": ["实现 top-2 router 并记录每专家 token 数。", "构造偏置 logits 制造热门专家，比较无辅助损失与负载约束。", "用通信时间模型估算不同专家放置下的 All-to-All 占比。"],
+      "successCriteria": ["能画出专家 token 分布并解释 P95/P50 差异。", "能指出至少一种提升吞吐但可能损害质量的策略。"]
+    },
+    "selfCheck": ["为什么总参数相同的 MoE 与 Dense 模型每 token 成本不同？", "专家负载不均如何同时影响吞吐和模型质量？", "哪些通信可以与专家计算重叠，前提是什么？"],
+    "sources": [
+      { "label": "DeepSeek-AI, DeepSeek-V3 Technical Report", "url": "https://arxiv.org/abs/2412.19437", "type": "技术报告" },
+      { "label": "NVIDIA, Scaling MoE pre-training on GB300 NVL72", "url": "https://developer.nvidia.com/blog/setting-a-world-record-for-moe-pre-training-on-nvidia-gb300-nvl72/", "type": "官方工程博客" }
+    ]
+  },
+  {
+    "slug": "clip-contrastive-multimodal-learning",
+    "track": "multimodal",
+    "order": 1,
+    "updatedAt": "2026-07-27",
+    "title": "CLIP：用对比学习建立图文共享坐标系",
+    "description": "从双塔编码器、相似度矩阵和对称交叉熵出发，理解零样本迁移为何成立，以及它在哪里失效。",
+    "difficulty": "进阶",
+    "duration": "65 分钟",
+    "objectives": ["推导 batch 内图文对比损失", "解释温度参数与 hard negatives", "设计一个可诊断的零样本图像分类实验"],
+    "prerequisites": ["交叉熵与 softmax", "CNN 或 Vision Transformer 基础"],
+    "keyTerms": ["dual encoder", "contrastive learning", "temperature", "zero-shot transfer", "prompt ensemble"],
+    "conceptMap": ["图像编码器和文本编码器把两种模态映射到同一向量空间。", "一个 batch 的 N 对图文形成 N×N 相似度矩阵，对角线是正样本，其余是 batch 内负样本。", "自然语言类别描述变成分类器权重，使同一表示支持零样本迁移。"],
+    "mentalModel": "CLIP 不是让模型逐字生成描述，而是在训练一个跨模态检索坐标系。每张图和每段文本都获得一个单位向量；训练推动真实配对靠近、错误配对远离。零样本分类只是把候选类别写成文本，再询问图像向量最接近哪段文本。",
+    "mechanism": ["图像编码器得到 I∈R^(N×d)，文本编码器得到 T∈R^(N×d)，两者做 L2 归一化。", "相似度 S=I·T^T/τ 形成 N×N 矩阵，分别对图到文和文到图计算交叉熵并取平均。", "推理时将类别模板编码为文本原型，图像与原型的相似度经过 softmax 得到零样本预测。"],
+    "codePath": ["检查 image_encoder、text_encoder 与 projection head 的输出维度。", "观察 normalize、logit_scale 和矩阵乘法形成的 N×N logits。", "比较单模板与 prompt ensemble 的类别原型和错误切片。"],
+    "tensorFlow": ["images [N,3,H,W] → image features [N,d]；tokens [N,L] → text features [N,d]", "normalized features → similarity [N,N] → two cross-entropies → scalar loss"],
+    "pseudocode": ["image = normalize(image_encoder(images))", "text = normalize(text_encoder(tokens))", "logits = exp(logit_scale) * image @ text.T", "labels = arange(batch_size)", "loss_i = cross_entropy(logits, labels)", "loss_t = cross_entropy(logits.T, labels)", "loss = (loss_i + loss_t) / 2"],
+    "engineeringMeaning": ["batch 大小同时决定负样本数量和显存/通信成本，分布式 all-gather 会进入关键路径。", "零样本结果高度依赖模板、类别语义和数据分布，必须报告 prompt 与失败切片。"],
+    "decisionTable": [
+      { "condition": "需要大规模检索与缓存", "choose": "双塔编码器", "because": "图像和文本向量可以离线计算并使用 ANN 索引" },
+      { "condition": "需要细粒度跨模态交互", "choose": "交叉编码器或多模态生成模型", "because": "token/patch 级交互能力更强，但检索成本更高" },
+      { "condition": "类别名称有歧义", "choose": "多模板与人工语义审查", "because": "类别原型本质上由文本提示定义" }
+    ],
+    "lab": {
+      "title": "构建可解释的零样本分类基线",
+      "steps": ["选取 5–10 个可区分类别并编写三组文本模板。", "计算图像—文本相似度，比较单模板与模板平均。", "按背景、尺度和细粒度属性建立失败切片。"],
+      "successCriteria": ["报告模板变化对每类准确率的影响。", "找到至少一个高相似但语义错误的样本并解释原因。"]
+    },
+    "selfCheck": ["为什么对称损失要同时计算 image→text 和 text→image？", "温度参数过大或过小分别会怎样？", "CLIP 的零样本分类为什么不是无监督分类？"],
+    "sources": [
+      { "label": "Radford et al., Learning Transferable Visual Models From Natural Language Supervision", "url": "https://arxiv.org/abs/2103.00020", "type": "原始论文" },
+      { "label": "OpenAI CLIP 官方代码", "url": "https://github.com/openai/CLIP", "type": "官方源码" }
+    ]
+  },
+  {
+    "slug": "preference-alignment-from-rlhf-to-dpo",
+    "track": "training",
+    "order": 1,
+    "updatedAt": "2026-07-27",
+    "title": "偏好对齐：从 RLHF 管线到 DPO 目标",
+    "description": "把偏好数据、奖励模型、KL 约束和直接偏好优化放进同一框架，理解算法简化没有消除数据风险。",
+    "difficulty": "进阶",
+    "duration": "80 分钟",
+    "objectives": ["画出 SFT→奖励模型→PPO 的完整数据流", "解释 DPO 如何把隐式奖励写进分类目标", "识别偏好数据泄漏、长度偏差和过优化"],
+    "prerequisites": ["最大似然与交叉熵", "策略梯度和 KL 散度基础"],
+    "keyTerms": ["preference pair", "reward model", "KL penalty", "PPO", "DPO"],
+    "conceptMap": ["SFT 让模型学习示范分布，偏好数据比较同一提示下的 chosen/rejected。", "经典 RLHF 先拟合奖励模型，再用带 KL 约束的强化学习优化策略。", "DPO 利用最优策略与奖励之间的关系，直接在偏好对上优化分类式目标。"],
+    "mentalModel": "偏好对齐不是给模型一个固定正确答案，而是学习人类对两个候选输出的相对选择。RLHF 把这种选择先压缩成奖励函数，再让策略追逐奖励；DPO 把参考策略当作锚点，直接提高 chosen 相对 rejected 的对数概率差。两者都无法修复偏好数据本身的偏差。",
+    "mechanism": ["收集 (x,y_w,y_l) 偏好对；奖励模型用 Bradley–Terry 假设学习 P(y_w≻y_l)。", "PPO-RLHF 最大化奖励，同时用 KL 惩罚限制策略偏离 SFT/reference 模型。", "DPO 比较策略与参考模型在 chosen/rejected 上的 log-ratio，用 logistic loss 直接优化偏好。"],
+    "codePath": ["核对 tokenizer、chat template 与 chosen/rejected 截断是否一致。", "分别计算 policy 和 reference 的 sequence log-prob，再形成 pairwise logits。", "监控 preference accuracy、隐式奖励 margin、KL、长度分布和能力回归。"],
+    "tensorFlow": ["chosen/rejected tokens [B,2,L] → policy logits [B,2,L,V] → masked sequence logp [B,2]", "policy log-ratio − reference log-ratio → β scaling → logsigmoid → batch loss"],
+    "pseudocode": ["pi_chosen, pi_rejected = sequence_logp(policy, pair)", "ref_chosen, ref_rejected = sequence_logp(reference, pair)", "policy_ratio = pi_chosen - pi_rejected", "reference_ratio = ref_chosen - ref_rejected", "preference_logit = beta * (policy_ratio - reference_ratio)", "loss = -mean(logsigmoid(preference_logit))"],
+    "engineeringMeaning": ["DPO 减少在线采样与 PPO 训练复杂度，但参考模型前向、序列 log-prob 和数据质量仍是主要成本。", "对齐结果必须同时看偏好胜率、基础能力回归、安全切片、长度偏差和真实任务成功率。"],
+    "decisionTable": [
+      { "condition": "有高质量静态偏好对、训练稳定性优先", "choose": "DPO 类直接偏好优化", "because": "实现与调参路径更短，不需要在线 RL rollout" },
+      { "condition": "奖励可在线验证、需要探索复杂动作", "choose": "RLHF / RL 路径", "because": "可以利用环境反馈和策略探索" },
+      { "condition": "只有高质量示范、偏好标签不足", "choose": "先做 SFT 与评测", "because": "伪造低质量偏好会放大标注偏差" }
+    ],
+    "lab": {
+      "title": "审计一个偏好数据集并实现 DPO loss",
+      "steps": ["统计 chosen/rejected 长度、格式和重复提示，寻找结构性偏差。", "用固定 logits 实现并单元测试 DPO loss 的符号和 β 效应。", "构造长度偏差样本，观察模型是否把长度当作奖励代理。"],
+      "successCriteria": ["能证明提高 chosen 相对 log-ratio 会降低 loss。", "输出一份包含数据偏差、评测切片和停止条件的训练卡。"]
+    },
+    "selfCheck": ["为什么 DPO 仍需要 reference model？", "β 增大如何影响偏好拟合与策略漂移？", "偏好胜率提高为什么可能伴随基础能力下降？"],
+    "sources": [
+      { "label": "Ouyang et al., Training language models to follow instructions with human feedback", "url": "https://arxiv.org/abs/2203.02155", "type": "原始论文" },
+      { "label": "Rafailov et al., Direct Preference Optimization", "url": "https://arxiv.org/abs/2305.18290", "type": "原始论文" }
+    ]
+  },
+  {
     "slug": "kv-cache-to-continuous-batching",
     "track": "inference",
     "order": 1,
     "updatedAt": "2026-07-27",
     "title": "从 KV Cache 到 Continuous Batching",
-    "description": "沿一次自回归请求的数据流，理解显存、调度与吞吐为何必须共同优化。",
+    "description": "沿一次自回归请求的数据流，建立显存、调度、吞吐和延迟的统一性能模型。",
     "difficulty": "进阶",
-    "duration": "35 分钟",
-    "conceptMap": [
-      "自回归 decode 每步只生成一个 token，却需要读取所有历史 K/V。",
-      "PagedAttention 解决 KV 内存碎片，Continuous Batching 解决请求生命周期不一致造成的算力空洞。",
-      "吞吐、首 token 延迟与单 token 延迟是三个不同目标。"
+    "duration": "75 分钟",
+    "objectives": ["估算单请求 KV Cache 大小", "区分 prefill 与 decode 的算术强度", "解释 PagedAttention 和 Continuous Batching 分别解决什么"],
+    "prerequisites": ["Transformer 自注意力", "GPU 显存与批处理基础"],
+    "keyTerms": ["KV Cache", "prefill", "decode", "PagedAttention", "continuous batching"],
+    "conceptMap": ["自回归 decode 每步只产生一个 token，却需要读取所有历史层的 K/V。", "PagedAttention 解决 KV 内存碎片与共享，Continuous Batching 解决请求生命周期不一致造成的算力空洞。", "TTFT、TPOT、吞吐和请求完成率是不同目标，不能用单一 QPS 代替。"],
+    "mentalModel": "把推理服务看成机场：prefill 像集中安检，计算密集且可以大批处理；decode 像每位乘客逐步登机，每一步很小但要反复读取全部历史状态。PagedAttention 管理登机口和候机区的内存块，Continuous Batching 则持续把新乘客填进空出的服务槽。",
+    "mechanism": ["每层缓存历史 token 的 key/value；总容量随层数、KV heads、head_dim、序列长度和数据类型线性增长。", "PagedAttention 用固定大小物理块和 block table 将逻辑序列映射到非连续显存。", "Continuous Batching 在每个调度步接纳新请求、推进 decode，并根据容量执行抢占、换出或拒绝。"],
+    "codePath": ["从 waiting/running/swapped 队列观察请求状态迁移。", "沿 block table 追踪逻辑 KV block 到物理显存 block 的映射。", "分别记录 scheduler、attention kernel、sampling 与通信开销。"],
+    "tensorFlow": ["prefill: tokens [B,S] → Q/K/V [B,H,S,D] → logits；并写入 S 个位置的 KV", "decode: token [B,1] → Q [B,Hq,1,D]，读取 K/V [B,Hkv,S,D] → next-token logits"],
+    "pseudocode": ["while active_requests:", "  budget = scheduler.token_budget()", "  batch = admit_and_select(requests, budget)", "  blocks = kv_manager.ensure_capacity(batch)", "  logits = model.forward(batch.tokens, blocks)", "  append_sampled_tokens(batch, sample(logits))", "  release_finished_blocks(batch)"],
+    "engineeringMeaning": ["批越大不一定越好：decode 延迟、KV 容量、抢占和尾部请求共同限制有效 batch。", "优化应同时报告 TTFT、TPOT、吞吐、KV 使用率、抢占次数和 SLO 完成率。"],
+    "decisionTable": [
+      { "condition": "长短请求混合、到达持续", "choose": "continuous batching + 分块 KV", "because": "减少生命周期不一致和内存碎片" },
+      { "condition": "严格交互延迟 SLO", "choose": "限制 token budget 并做优先级调度", "because": "防止大 prefill 阻塞 decode" },
+      { "condition": "离线吞吐优先", "choose": "更大 batch 与 chunked prefill", "because": "提高 GPU 占用并接受更高单请求延迟" }
     ],
-    "codePath": [
-      "从请求调度器观察 waiting/running/swapped 队列如何迁移。",
-      "沿 block table 追踪逻辑 KV block 到物理显存 block 的映射。",
-      "对比 prefill 与 decode 的张量形状和算术强度。"
-    ],
-    "engineeringMeaning": [
-      "批越大不一定越好：decode 延迟、KV 容量和抢占成本会共同限制有效 batch。",
-      "Serving 优化应同时记录 TTFT、TPOT、吞吐、KV 使用率和请求完成率。"
-    ],
-    "selfCheck": [
-      "为什么传统静态 batching 会被最长请求拖住？",
-      "PagedAttention 改善的是计算复杂度还是内存管理？",
-      "当 KV cache 接近满载时，调度器有哪些可选策略？"
-    ],
+    "lab": {
+      "title": "建立 Serving 容量与延迟模型",
+      "steps": ["根据层数、KV heads、head dim、dtype 计算每 token KV 字节数。", "构造长短请求到达序列，比较静态 batching 与 continuous batching。", "画出并发数增加时 TTFT、TPOT 和 KV 使用率的变化。"],
+      "successCriteria": ["估算值与实际显存增长在可解释误差范围内。", "能找到吞吐继续上升但 SLO 完成率开始下降的拐点。"]
+    },
+    "selfCheck": ["为什么传统静态 batching 会被最长请求拖住？", "PagedAttention 改善的是计算复杂度还是内存管理？", "KV 接近满载时调度器有哪些策略，各自牺牲什么？"],
     "sources": [
-      { "label": "Kwon et al., Efficient Memory Management for LLM Serving with PagedAttention", "url": "https://arxiv.org/abs/2309.06180" },
-      { "label": "vLLM 官方文档", "url": "https://docs.vllm.ai/" }
+      { "label": "Kwon et al., Efficient Memory Management for LLM Serving with PagedAttention", "url": "https://arxiv.org/abs/2309.06180", "type": "原始论文" },
+      { "label": "vLLM 官方文档", "url": "https://docs.vllm.ai/", "type": "官方文档" }
     ]
   },
   {
@@ -40,62 +147,66 @@
     "title": "Agent 的状态、验证与失败恢复",
     "description": "把 Agent 从“会调用工具”推进到可观察、可中断、可验证和可恢复的生产系统。",
     "difficulty": "进阶",
-    "duration": "40 分钟",
-    "conceptMap": [
-      "模型负责提出动作，Harness 负责状态、权限、工具执行和终止条件。",
-      "最终答案正确不代表过程安全；工具副作用和恢复路径必须单独评测。",
-      "长任务状态应区分上下文、外部工作记忆和持久业务状态。"
+    "duration": "75 分钟",
+    "objectives": ["区分模型上下文、工作记忆和业务状态", "为副作用工具设计幂等与验证协议", "把一次生产失败转为过程级回放用例"],
+    "prerequisites": ["LLM 工具调用", "分布式系统重试与幂等基础"],
+    "keyTerms": ["harness", "trace envelope", "idempotency key", "checkpoint", "replay eval"],
+    "conceptMap": ["模型提出动作，Harness 管理状态、权限、工具执行和终止条件。", "最终答案正确不代表过程安全；工具副作用、权限边界和恢复路径必须单独评测。", "长任务状态要区分上下文、外部工作记忆和持久业务状态。"],
+    "mentalModel": "把模型看作不完全可靠的控制器，把 harness 看作操作系统。控制器可以建议下一动作，但操作系统负责权限、真实状态、资源、审计和恢复。可靠 Agent 不是让模型永不犯错，而是让错误可见、可阻断、可验证，并且恢复不会重复副作用。",
+    "mechanism": ["每个 step 产生 plan/act/observe/verify/recover 事件，事件带 run_id、step_id、输入摘要和状态版本。", "副作用工具要求前置条件、幂等键、审批策略和执行后验证；重试前先检查外部状态。", "checkpoint 保存可恢复状态，replay case 固化期望工具序列、禁止动作、最终状态与通知策略。"],
+    "codePath": ["定义统一 trace envelope 并将模型输出与工具结果分开。", "在 tool gateway 实现权限、幂等、超时和 postcondition。", "从生产 trace 生成最小回放用例并加入发布门禁。"],
+    "tensorFlow": ["model context → proposed action；state store(versioned) + policy → authorized tool request", "tool result + external state → verifier → commit checkpoint / recover / escalate"],
+    "pseudocode": ["state = load_checkpoint(run_id)", "action = model.propose(context, state)", "decision = policy.authorize(action, state)", "result = tools.execute(action, idempotency_key)", "verified = verifier.check(result, external_state)", "if verified: checkpoint(state.apply(result))", "else: recover_or_escalate(state, result)"],
+    "engineeringMeaning": ["生产可靠性主要来自 Harness、工具协议和评测，而不是无限延长 system prompt。", "显式状态机使中断、重试、审批、成本归因和故障恢复成为可测试行为。"],
+    "decisionTable": [
+      { "condition": "只读、低风险查询", "choose": "自动执行并记录", "because": "副作用低，延迟比人工审批更重要" },
+      { "condition": "可逆但有外部写入", "choose": "幂等执行 + postcondition", "because": "允许自动化同时控制重复写入" },
+      { "condition": "不可逆或高影响动作", "choose": "人工审批 + 双重验证", "because": "模型置信度不能替代授权" }
     ],
-    "codePath": [
-      "定义 plan、act、observe、verify、recover 五类事件的统一 trace envelope。",
-      "给每个有副作用工具增加幂等键、前置条件和执行后验证。",
-      "把一次生产失败转成含预期工具序列与禁止动作的回放用例。"
-    ],
-    "engineeringMeaning": [
-      "生产可靠性更多来自 Harness，而不是把 system prompt 写得更长。",
-      "显式状态机让中断、重试、审批和成本归因成为可测试行为。"
-    ],
-    "selfCheck": [
-      "哪些信息应留在模型上下文，哪些应写入外部状态？",
-      "如何证明一次重试不会重复扣款或重复发布？",
-      "为什么只比较最终答案会漏掉高风险回归？"
-    ],
+    "lab": {
+      "title": "实现一个可恢复的发布 Agent",
+      "steps": ["定义 draft、validated、published、verified 四状态和允许迁移。", "为 publish 工具加入幂等键并模拟超时但实际成功。", "编写回放用例验证重试不会重复发布且会正确通知。"],
+      "successCriteria": ["同一幂等键重复执行不产生第二个外部对象。", "超时、权限拒绝和 postcondition 失败都有确定的恢复结果。"]
+    },
+    "selfCheck": ["哪些信息应留在模型上下文，哪些必须进入外部状态？", "如何证明一次重试不会重复扣款或发布？", "为什么只比较最终答案会漏掉高风险回归？"],
     "sources": [
-      { "label": "Anthropic, Building effective agents", "url": "https://www.anthropic.com/research/building-effective-agents" },
-      { "label": "OpenAI Agents SDK 文档", "url": "https://openai.github.io/openai-agents-python/" }
+      { "label": "Anthropic, Building effective agents", "url": "https://www.anthropic.com/research/building-effective-agents", "type": "官方研究文章" },
+      { "label": "OpenAI Agents SDK 文档", "url": "https://openai.github.io/openai-agents-python/", "type": "官方文档" }
     ]
   },
   {
-    "slug": "moe-from-routing-to-all-to-all",
-    "track": "foundation",
+    "slug": "holistic-llm-evaluation",
+    "track": "evaluation",
     "order": 1,
     "updatedAt": "2026-07-27",
-    "title": "MoE：从路由公式到 All-to-All 瓶颈",
-    "description": "理解稀疏专家为何节省每 token 计算，却把系统压力转移到负载均衡和跨卡通信。",
+    "title": "整体评测：从单一准确率到上线门禁",
+    "description": "把场景、指标、提示、切片、成本和失败追踪组合成可复现、可决策的评测系统。",
     "difficulty": "进阶",
-    "duration": "45 分钟",
-    "conceptMap": [
-      "Router 为每个 token 选择少量专家，总参数与激活参数因此解耦。",
-      "Expert Parallel 需要把 token 发送到专家所在设备，形成 All-to-All 通信。",
-      "容量因子、辅助损失和路由策略共同决定丢 token、负载与质量。"
+    "duration": "75 分钟",
+    "objectives": ["建立 scenario×metric 评测矩阵", "识别提示、解码和数据污染对分数的影响", "把失败切片转成发布门禁"],
+    "prerequisites": ["基本统计指标", "语言模型推理与提示"],
+    "keyTerms": ["scenario", "metric", "slice", "calibration", "contamination", "release gate"],
+    "conceptMap": ["评测对象必须是具体任务与使用场景，不是抽象的“智能”。", "准确率之外还要考虑校准、鲁棒性、公平性、安全、效率和成本。", "可复现需要固定模型版本、提示、few-shot、解码、数据版本和评分器。"],
+    "mentalModel": "模型评测像软件测试加临床试验：既要有标准化基准用于横向比较，也要有代表真实用户和高风险边界的切片。一个总分会隐藏取舍；真正能支持上线决策的是场景×指标矩阵、置信区间、失败样本和明确的阻断阈值。",
+    "mechanism": ["先定义使用场景与失败成本，再选择数据集、切片和多个指标，避免从现成榜单反推目标。", "执行时冻结模型 revision、prompt、few-shot、sampling、库版本和硬件，并保存原始输出。", "分析总体与切片置信区间、成本和失败类型，将关键阈值写入 release gate。"],
+    "codePath": ["用 YAML/代码固定 task、prompt、metric、model args 和版本。", "保存逐样本 request、response、score、latency、token 和 error category。", "聚合时先看切片和置信区间，再生成比较表与门禁结果。"],
+    "tensorFlow": ["dataset records → prompt renderer → model requests → raw generations", "generations + references/judges → per-example metrics → slice aggregates + confidence intervals"],
+    "pseudocode": ["config = freeze_eval_config(model, prompt, decoding, dataset)", "for sample in dataset:", "  output, telemetry = run_model(sample, config)", "  metrics = score(output, sample.reference)", "  log(sample.id, output, telemetry, metrics, slices(sample))", "report = aggregate_with_confidence_intervals(logs)", "assert_release_gates(report, thresholds)"],
+    "engineeringMeaning": ["榜单分数只有在提示、数据、解码和模型版本一致时才可比较；API 模型更新会破坏长期可比性。", "线上 Agent 还要评测工具序列、禁止动作、最终状态、恢复和通知，不能只看文本答案。"],
+    "decisionTable": [
+      { "condition": "研究模型能力边界", "choose": "标准化多场景 benchmark", "because": "有利于与公开结果比较和复现" },
+      { "condition": "决定产品是否上线", "choose": "真实任务集 + 风险切片 + 成本门禁", "because": "公开基准不能代表业务失败成本" },
+      { "condition": "评测开放式生成", "choose": "多评分器 + 人审校准 + 原始样本", "because": "单一 LLM judge 可能有位置和风格偏差" }
     ],
-    "codePath": [
-      "沿 router logits → top-k → dispatch → expert MLP → combine 跟踪张量。",
-      "记录每专家 token 数、跨节点流量、通信重叠率和尾部延迟。",
-      "比较专家放置、分组路由和通信—计算重叠策略。"
-    ],
-    "engineeringMeaning": [
-      "MoE 的 FLOPs 优势不会自动变成 wall-clock 优势；网络拓扑可能成为主瓶颈。",
-      "优化目标应从单 GPU 算力扩展到每瓦、每卡和每机架的有效 token。"
-    ],
-    "selfCheck": [
-      "总参数相同的 MoE 与 Dense 模型为什么每 token 成本不同？",
-      "专家负载不均会如何同时影响吞吐和模型质量？",
-      "哪些通信可以和专家计算重叠？"
-    ],
+    "lab": {
+      "title": "为一个真实工作流建立发布门禁",
+      "steps": ["收集 20–50 个真实任务并按风险、长度和工具类型切片。", "固定两种模型/提示配置，保存逐样本输出、token、延迟和错误。", "定义至少三个门禁：任务成功率、关键风险零容忍、单位成功任务成本。"],
+      "successCriteria": ["另一位工程师可以使用配置复现结果。", "至少一个总体分数看不出的切片失败会阻止发布。"]
+    },
+    "selfCheck": ["为什么两个论文中的同名 benchmark 分数可能不可比？", "何时应该报告宏平均、微平均或最差切片？", "如何防止评测集逐渐被提示和训练过程污染？"],
     "sources": [
-      { "label": "DeepSeek-V3 Technical Report", "url": "https://arxiv.org/abs/2412.19437" },
-      { "label": "NVIDIA, Scaling MoE pre-training on GB300 NVL72", "url": "https://developer.nvidia.com/blog/setting-a-world-record-for-moe-pre-training-on-nvidia-gb300-nvl72/" }
+      { "label": "Liang et al., Holistic Evaluation of Language Models", "url": "https://arxiv.org/abs/2211.09110", "type": "原始论文" },
+      { "label": "EleutherAI, Language Model Evaluation Harness", "url": "https://github.com/EleutherAI/lm-evaluation-harness", "type": "开源评测框架" }
     ]
   }
 ]
