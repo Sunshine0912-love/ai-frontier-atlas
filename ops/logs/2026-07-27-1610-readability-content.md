@@ -35,7 +35,10 @@
 
 ## 发布结果
 
-- 待合并到 `main` 并验证 GitHub Pages。
+- 已合并并推送 `main`，commit `449ab55`。
+- GitHub Actions `30249200953` 的 build 与 deploy 均成功。
+- 生产首页、课程目录、MoE 长文与整体评测长文均返回 HTTP 200；线上 MoE 页面检测到 2 个 KaTeX 公式块。
+- 生产地址：https://sunshine0912-love.github.io/ai-frontier-atlas/
 
 ## 下一方向
 
