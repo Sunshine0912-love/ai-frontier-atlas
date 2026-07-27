@@ -18,10 +18,13 @@ export function buildReview({ frontier, lessons, tracks }, now = new Date()) {
   const trackCoverage = tracks.map(track => {
     const items = lessons.filter(lesson => lesson.track === track.id);
     const latest = items.map(item => item.updatedAt).sort().at(-1) || '';
+    const planned = track.plannedLessons || 0;
     return {
       id: track.id,
       title: track.title,
       lessons: items.length,
+      planned,
+      readiness: `${items.length}/${planned || items.length}`,
       latest,
       daysSinceLatest: daysBetween(now, latest)
     };
@@ -31,6 +34,24 @@ export function buildReview({ frontier, lessons, tracks }, now = new Date()) {
     .map(track => track.lessons === 0
       ? `「${track.title}」路线尚无课程，应先补齐核心入门节点。`
       : `「${track.title}」路线超过 45 天未更新，应复查内容与来源。`);
+  const scoredFrontier = frontier.filter(item => {
+    const scores = item.scores || {};
+    return ['novelty', 'impact', 'evidence', 'reproducibility']
+      .every(key => Number.isInteger(scores[key]));
+  }).length;
+  const deepLessons = lessons.filter(lesson =>
+    (lesson.sources?.length || 0) >= 2
+    && (lesson.lab?.steps?.length || 0) >= 3
+    && (lesson.objectives?.length || 0) >= 3
+  ).length;
+  const sourceCount = frontier.reduce((sum, item) => sum + (item.sources?.length || 0), 0)
+    + lessons.reduce((sum, item) => sum + (item.sources?.length || 0), 0);
+  if (scoredFrontier < frontier.length) {
+    gaps.push(`${frontier.length - scoredFrontier} 条前沿信号缺少完整四维评分。`);
+  }
+  if (deepLessons < lessons.length) {
+    gaps.push(`${lessons.length - deepLessons} 节课程未达到目标/实验/双来源的深度标准。`);
+  }
 
   return {
     version: 1,
@@ -41,6 +62,11 @@ export function buildReview({ frontier, lessons, tracks }, now = new Date()) {
       tracks: tracks.length,
       latestFrontierDate: frontier.map(item => item.publishedAt).sort().at(-1) || '',
       latestLessonDate: lessons.map(item => item.updatedAt).sort().at(-1) || ''
+    },
+    quality: {
+      frontierScoreCoverage: `${scoredFrontier}/${frontier.length}`,
+      deepLessonCoverage: `${deepLessons}/${lessons.length}`,
+      directReferences: sourceCount
     },
     categoryCoverage,
     trackCoverage,

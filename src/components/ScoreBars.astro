@@ -1,0 +1,27 @@
+---
+interface Scores {
+  novelty: number;
+  impact: number;
+  evidence: number;
+  reproducibility: number;
+}
+interface Props { scores: Scores; compact?: boolean }
+const { scores, compact = false } = Astro.props;
+const metrics = [
+  ['新颖', scores.novelty],
+  ['影响', scores.impact],
+  ['证据', scores.evidence],
+  ['复现', scores.reproducibility]
+];
+---
+
+<div class:list={['score-bars', { compact }]} aria-label="编辑评分">
+  {metrics.map(([label, score]) => (
+    <div class="score-item">
+      <span>{label}</span>
+      <div class="score-track" aria-hidden="true"><i style={`--score:${score}`}></i></div>
+      <strong>{score}</strong>
+    </div>
+  ))}
+</div>
+

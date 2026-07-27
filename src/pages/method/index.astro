@@ -2,27 +2,54 @@
 import Layout from '../../components/Layout.astro';
 ---
 
-<Layout title="来源与方法｜AI Frontier Atlas" description="AI Frontier Atlas 的来源分级、判断边界和双更维护方法。">
-  <section class="page-hero shell compact method-hero">
-    <p class="eyebrow">EDITORIAL STANDARD</p>
-    <h1>来源与方法</h1>
-    <p>速度不是牺牲准确性的理由。每轮更新先回顾当前站点，再计划行动；每个重要结论都能回到证据。</p>
+<Layout title="研究方法｜AI Frontier Atlas" description="AI Frontier Atlas 的来源分级、判断边界、评分方法与双更维护标准。">
+  <section class="page-intro shell">
+    <p class="kicker">RESEARCH STANDARD</p>
+    <div><h1>来源、判断<br />与评分方法</h1><p>专业性不是语气更确定，而是读者能看见证据来自哪里、推断经过什么链条、哪些信息仍然缺失。</p></div>
   </section>
-  <section class="method-grid shell">
-    <article><span>S</span><h2>原始证据</h2><p>论文、官方技术报告、源码、模型卡、评测仓库、监管文件。可以直接支撑事实陈述。</p></article>
-    <article><span>A</span><h2>可靠解释</h2><p>作者演讲、机构工程博客、可复现实验和方法透明的数据分析。用于补充上下文。</p></article>
-    <article><span>B</span><h2>线索来源</h2><p>媒体、社区和社交内容。只用于发现线索，不独立支撑关键技术结论。</p></article>
+
+  <section class="principle-banner shell">
+    <span>CORE PRINCIPLE</span>
+    <p>来源强度回答“这条信息离原始事件有多近”；结论可信度回答“现有证据能支持多大的外推”。两者不能混为一谈。</p>
   </section>
-  <section class="judgement shell">
-    <div><p class="eyebrow">CLAIM BOUNDARIES</p><h2>三层表达边界</h2></div>
+
+  <section class="method-section shell">
+    <header><p class="section-code">01 / SOURCE HIERARCHY</p><h2>来源分级</h2></header>
+    <div class="source-levels">
+      <article><strong>S</strong><div><h3>直接来源</h3><p>论文、技术报告、源码、模型卡、官方工程数据、监管原文。</p><small>可直接证明来源明确陈述的事实；官方自述仍需要外部复现。</small></div></article>
+      <article><strong>A</strong><div><h3>可靠解释</h3><p>作者演讲、机构工程复盘、方法透明的独立实验。</p><small>用于解释机制、复现和上下文，不覆盖其未测试范围。</small></div></article>
+      <article><strong>B</strong><div><h3>线索来源</h3><p>媒体、社区、社交内容和未给方法的排行榜。</p><small>只用于发现线索，不独立支撑关键结论。</small></div></article>
+    </div>
+  </section>
+
+  <section class="method-section shell scoring-section">
+    <header><p class="section-code">02 / SCORING</p><h2>四维评分方法</h2><p>1–5 分是编辑判断，用于同站比较；新证据出现后可以修订。</p></header>
+    <div class="score-methods">
+      <article><span>N</span><h3>新颖性 Novelty</h3><p>相对已知方法，是新机制、新组合还是常规迭代？</p><ol><li>1：重复或小改</li><li>3：显著工程推进</li><li>5：改变技术路径</li></ol></article>
+      <article><span>I</span><h3>影响 Impact</h3><p>会改变能力、成本、研究议程或生产决策吗？</p><ol><li>1：局部影响</li><li>3：影响一个技术栈</li><li>5：跨领域重排</li></ol></article>
+      <article><span>E</span><h3>证据 Evidence</h3><p>方法、数据、对照和限制是否足够透明？</p><ol><li>1：只有声明</li><li>3：有方法与数据</li><li>5：多方独立证据</li></ol></article>
+      <article><span>R</span><h3>复现 Reproducibility</h3><p>外部团队能否获取产物并在合理成本下验证？</p><ol><li>1：封闭且不可审计</li><li>3：部分产物</li><li>5：代码数据权重齐全</li></ol></article>
+    </div>
+  </section>
+
+  <section class="method-section shell">
+    <header><p class="section-code">03 / CLAIM BOUNDARIES</p><h2>三层表达边界</h2></header>
+    <div class="claim-layers">
+      <div><span>FACT</span><strong>事实</strong><p>来源直接写明、他人可以回到原文复核的内容。</p></div>
+      <div><span>INFERENCE</span><strong>推断</strong><p>由多个事实连接出的解释，必须展示机制与推导链。</p></div>
+      <div><span>VIEW</span><strong>判断</strong><p>面向研究或工程的可证伪观点，同时说明不确定性和下一观察点。</p></div>
+    </div>
+  </section>
+
+  <section class="review-loop shell">
+    <div><p class="section-code">04 / REVIEW-FIRST LOOP</p><h2>每次更新先回顾，再计划</h2></div>
     <ol>
-      <li><span>FACT</span><div><strong>事实</strong><p>来源直接写明、可以被他人复核的内容。</p></div></li>
-      <li><span>INFERENCE</span><div><strong>推断</strong><p>从多个事实推出的解释，必须展示推导链。</p></div></li>
-      <li><span>VIEW</span><div><strong>判断</strong><p>面向工程或产业的可证伪观点，明确不确定性。</p></div></li>
+      <li><span>01</span><strong>回顾</strong><p>读当前站点、数据、覆盖和修订记录。</p></li>
+      <li><span>02</span><strong>识别缺口</strong><p>找重复、陈旧、空路线和证据不足。</p></li>
+      <li><span>03</span><strong>计划</strong><p>先写选择理由、不做什么和验收标准。</p></li>
+      <li><span>04</span><strong>研究</strong><p>核对一手来源，区分事实与判断。</p></li>
+      <li><span>05</span><strong>验证</strong><p>内容测试、类型检查、构建和链接复核。</p></li>
+      <li><span>06</span><strong>发布</strong><p>记录 commit、线上状态和下一方向。</p></li>
     </ol>
-  </section>
-  <section class="maintenance-loop shell">
-    <p class="eyebrow">TWICE-DAILY LOOP</p><h2>每次维护都从回顾开始</h2>
-    <div>{['回顾全站', '生成缺口', '制定计划', '研究与编辑', '测试与发布', '记录下一步'].map((item, index) => <span><i>{String(index + 1).padStart(2, '0')}</i>{item}</span>)}</div>
   </section>
 </Layout>

@@ -10,21 +10,84 @@ export function getStaticPaths() {
 const { lesson } = Astro.props;
 const track = tracks.find(item => item.id === lesson.track);
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const sections = [
+  ['objectives', '学习目标'],
+  ['model', '心智模型'],
+  ['mechanism', '机制拆解'],
+  ['code', '张量与代码'],
+  ['decision', '决策表'],
+  ['lab', '动手实验'],
+  ['check', '自检与来源']
+];
 ---
 
 <Layout title={`${lesson.title}｜AI Frontier Atlas`} description={lesson.description}>
-  <article class="lesson-page shell">
-    <nav class="breadcrumb"><a href={`${base}/learn/`}>学习图谱</a><span>/</span><a href={`${base}/learn/#${track?.id}`}>{track?.title}</a></nav>
-    <header class="lesson-hero">
-      <div><span class="lesson-track">{track?.number} · {track?.title}</span><span>{lesson.difficulty}</span><span>{lesson.duration}</span></div>
+  <article class="lesson-shell shell">
+    <nav class="breadcrumb" aria-label="面包屑"><a href={`${base}/learn/`}>课程体系</a><span>/</span><a href={`${base}/learn/#${track?.id}`}>{track?.title}</a><span>/</span><span>L{String(lesson.order).padStart(2, '0')}</span></nav>
+    <header class="research-lesson-hero">
+      <div class="lesson-labels"><span>{track?.stage}</span><span>{lesson.difficulty}</span><span>{lesson.duration}</span><span>更新 {lesson.updatedAt}</span></div>
       <h1>{lesson.title}</h1>
       <p>{lesson.description}</p>
-      <time datetime={lesson.updatedAt}>更新于 {lesson.updatedAt}</time>
+      <div class="term-row">{lesson.keyTerms.map((term: string) => <span>{term}</span>)}</div>
     </header>
-    <section class="lesson-block concept"><span class="block-index">01</span><div><p class="eyebrow">CONCEPT MAP</p><h2>概念地图</h2><ul>{lesson.conceptMap.map(item => <li>{item}</li>)}</ul></div></section>
-    <section class="lesson-block code"><span class="block-index">02</span><div><p class="eyebrow">CODE PATH</p><h2>代码脉络</h2><ol>{lesson.codePath.map(item => <li>{item}</li>)}</ol></div></section>
-    <section class="lesson-block engineering"><span class="block-index">03</span><div><p class="eyebrow">ENGINEERING</p><h2>工程意义</h2><ul>{lesson.engineeringMeaning.map(item => <li>{item}</li>)}</ul></div></section>
-    <section class="lesson-block self-check"><span class="block-index">04</span><div><p class="eyebrow">SELF CHECK</p><h2>自检问题</h2><ol>{lesson.selfCheck.map(item => <li>{item}</li>)}</ol></div></section>
-    <section class="lesson-sources"><p class="eyebrow">PRIMARY SOURCES</p><h2>原始资料</h2>{lesson.sources.map(source => <a href={source.url} target="_blank" rel="noreferrer">{source.label}<span>↗</span></a>)}</section>
+
+    <div class="lesson-layout">
+      <aside class="lesson-toc">
+        <p>CONTENTS</p>
+        <ol>{sections.map(([id, label], index) => <li><a href={`#${id}`}><span>{String(index + 1).padStart(2, '0')}</span>{label}</a></li>)}</ol>
+        <div><strong>先修知识</strong><ul>{lesson.prerequisites.map((item: string) => <li>{item}</li>)}</ul></div>
+      </aside>
+
+      <div class="lesson-content">
+        <section class="lesson-section objectives" id="objectives">
+          <header><span>01</span><div><p>LEARNING OBJECTIVES</p><h2>学习目标</h2></div></header>
+          <ol class="objective-list">{lesson.objectives.map((item: string) => <li>{item}</li>)}</ol>
+          <div class="concept-map"><strong>概念地图</strong>{lesson.conceptMap.map((item: string, index: number) => <div><span>{index + 1}</span><p>{item}</p></div>)}</div>
+        </section>
+
+        <section class="lesson-section" id="model">
+          <header><span>02</span><div><p>MENTAL MODEL</p><h2>先建立正确的心智模型</h2></div></header>
+          <blockquote>{lesson.mentalModel}</blockquote>
+        </section>
+
+        <section class="lesson-section" id="mechanism">
+          <header><span>03</span><div><p>MECHANISM</p><h2>机制拆解</h2></div></header>
+          <ol class="mechanism-list">{lesson.mechanism.map((item: string, index: number) => <li><span>{String(index + 1).padStart(2, '0')}</span><p>{item}</p></li>)}</ol>
+        </section>
+
+        <section class="lesson-section" id="code">
+          <header><span>04</span><div><p>TENSOR & CODE PATH</p><h2>张量与代码路径</h2></div></header>
+          <div class="tensor-flow">{lesson.tensorFlow.map((item: string) => <code>{item}</code>)}</div>
+          <div class="code-grid">
+            <div><strong>源码阅读顺序</strong><ol>{lesson.codePath.map((item: string) => <li>{item}</li>)}</ol></div>
+            <pre><code>{lesson.pseudocode.join('\n')}</code></pre>
+          </div>
+          <div class="engineering-note"><strong>工程意义</strong><ul>{lesson.engineeringMeaning.map((item: string) => <li>{item}</li>)}</ul></div>
+        </section>
+
+        <section class="lesson-section" id="decision">
+          <header><span>05</span><div><p>ENGINEERING DECISIONS</p><h2>决策表</h2></div></header>
+          <div class="decision-table" role="table">
+            <div class="decision-head" role="row"><span>条件</span><span>选择</span><span>理由</span></div>
+            {lesson.decisionTable.map((row: any) => <div class="decision-row" role="row"><p>{row.condition}</p><strong>{row.choose}</strong><p>{row.because}</p></div>)}
+          </div>
+        </section>
+
+        <section class="lesson-section lab-section" id="lab">
+          <header><span>06</span><div><p>HANDS-ON LAB</p><h2>动手实验</h2></div></header>
+          <h3>{lesson.lab.title}</h3>
+          <ol>{lesson.lab.steps.map((item: string) => <li>{item}</li>)}</ol>
+          <div class="success-box"><strong>验收标准</strong><ul>{lesson.lab.successCriteria.map((item: string) => <li>{item}</li>)}</ul></div>
+        </section>
+
+        <section class="lesson-section" id="check">
+          <header><span>07</span><div><p>SELF CHECK & SOURCES</p><h2>自检与一手资料</h2></div></header>
+          <ol class="self-check-list">{lesson.selfCheck.map((item: string, index: number) => <li><span>Q{index + 1}</span><p>{item}</p></li>)}</ol>
+          <div class="source-list">
+            {lesson.sources.map((source: any, index: number) => <a href={source.url} target="_blank" rel="noreferrer"><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{source.label}</strong><small>{source.type}</small></div><i>↗</i></a>)}
+          </div>
+        </section>
+      </div>
+    </div>
   </article>
 </Layout>

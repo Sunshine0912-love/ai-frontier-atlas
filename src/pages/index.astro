@@ -1,7 +1,7 @@
 ---
 import Layout from '../components/Layout.astro';
-import FrontierCard from '../components/FrontierCard.astro';
-import TrackCard from '../components/TrackCard.astro';
+import SignalRow from '../components/SignalRow.astro';
+import DomainMatrix from '../components/DomainMatrix.astro';
 import frontier from '../data/frontier.json';
 import tracks from '../data/tracks.json';
 import lessons from '../data/lessons.json';
@@ -9,64 +9,87 @@ import lessons from '../data/lessons.json';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const recent = [...frontier].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
 const latestDate = recent[0]?.publishedAt;
+const stages = [...new Set(tracks.map(track => track.stage))];
+const sourceCount = frontier.reduce((sum, item) => sum + item.sources.length, 0)
+  + lessons.reduce((sum, item) => sum + item.sources.length, 0);
 ---
 
-<Layout title="AI Frontier Atlas｜前沿图谱" description="独立的全球 AI 前沿追踪与关键技术系统学习网站。">
-  <section class="hero shell">
-    <div class="hero-grid">
-      <div class="hero-main">
-        <p class="eyebrow"><span class="live-dot"></span> INTELLIGENCE, NOT NOISE</p>
-        <h1>追踪 AI 前沿，<br /><em>建立技术坐标系。</em></h1>
-        <p class="hero-lead">把全球 AI 新进展压缩成可验证的工程信号，再把关键技术接成系统、高效、能落地的学习路径。</p>
-        <div class="hero-actions">
-          <a class="button primary" href={`${base}/frontier/`}>浏览前沿情报 <span>↗</span></a>
-          <a class="button ghost" href={`${base}/learn/`}>进入学习图谱 <span>→</span></a>
-        </div>
+<Layout title="AI Frontier Atlas｜AI 研究工作台" description="面向研究者与从业者的 AI 前沿情报、技术课程与工程实践工作台。">
+  <section class="desk-hero shell">
+    <div class="desk-intro">
+      <p class="kicker"><span class="status-pulse"></span> AI RESEARCH WORKBENCH · {latestDate}</p>
+      <h1>AI 前沿研究<br />与系统学习工作台</h1>
+      <p class="desk-lead">把模型、训练、推理、Agent 与评测放进同一技术坐标系。每条信号回到原始证据，每门课程走到代码、实验和工程决策。</p>
+      <div class="desk-actions">
+        <a class="primary-link" href={`${base}/frontier/`}>进入前沿情报 <span>→</span></a>
+        <a class="secondary-link" href={`${base}/learn/`}>查看课程体系</a>
       </div>
-      <aside class="hero-console">
-        <div class="console-head"><span>ATLAS STATUS</span><span class="status-ok">ONLINE</span></div>
-        <dl>
-          <div><dt>前沿信号</dt><dd>{frontier.length.toString().padStart(2, '0')}</dd></div>
-          <div><dt>学习路线</dt><dd>{tracks.length.toString().padStart(2, '0')}</dd></div>
-          <div><dt>技术课程</dt><dd>{lessons.length.toString().padStart(2, '0')}</dd></div>
-          <div><dt>最近更新</dt><dd class="date-value">{latestDate}</dd></div>
-        </dl>
-        <p>下一次维护窗口 <strong>21:00 CST</strong></p>
-      </aside>
     </div>
-    <div class="hero-ticker" aria-label="关注领域">
-      <span>MODELS</span><i></i><span>AI INFRA</span><i></i><span>AGENTS</span><i></i><span>MULTIMODAL</span><i></i><span>EVALUATION</span>
+    <aside class="research-brief">
+      <div class="panel-label"><span>EDITOR'S BRIEF</span><time>{latestDate}</time></div>
+      <h2>本期研究判断</h2>
+      <p class="brief-thesis">前沿竞争正在从“更大模型”迁移到架构、训练调度、推理系统与单位成功任务成本的联合优化。</p>
+      <ol>
+        <li><span>01</span><p>开放模型开始把训练轨迹、通信优化与硬件栈一起作为研究产物。</p></li>
+        <li><span>02</span><p>Agentic RL 的集群利用率暴露出算法之外的结构性系统空洞。</p></li>
+        <li><span>03</span><p>前沿闭源模型需要按真实任务成功率与总成本重做评测。</p></li>
+      </ol>
+      <div class="open-question"><span>OPEN QUESTION</span><p>超长上下文能力能否在可控状态成本下被第三方稳定复现？</p></div>
+    </aside>
+  </section>
+
+  <section class="metric-strip shell" aria-label="站点状态">
+    <div><span>VERIFIED SIGNALS</span><strong>{frontier.length}</strong><small>条核实信号</small></div>
+    <div><span>RESEARCH DOMAINS</span><strong>{tracks.length}</strong><small>个研究域</small></div>
+    <div><span>DEEP LESSONS</span><strong>{lessons.length}</strong><small>节完整课程</small></div>
+    <div><span>PRIMARY REFERENCES</span><strong>{sourceCount}</strong><small>个直接引用</small></div>
+    <div><span>UPDATE CADENCE</span><strong>2×</strong><small>每日两次回顾</small></div>
+  </section>
+
+  <section class="workbench-section shell">
+    <header class="section-header">
+      <div><p class="section-code">01 / SIGNAL BOARD</p><h2>最新研究信号</h2></div>
+      <p>按同一结构比较变化、机制、证据和可复现性。评分是编辑判断，不冒充事实。</p>
+      <a href={`${base}/frontier/`}>查看完整信号矩阵 →</a>
+    </header>
+    <div class="signal-board">
+      <div class="signal-table-head"><span>ID</span><span>研究对象与判断</span><span>证据 / 评分 / 来源</span></div>
+      {recent.map((item, index) => <SignalRow item={item} index={index} />)}
     </div>
   </section>
 
-  <section class="section shell">
-    <div class="section-heading">
-      <div><p class="eyebrow">01 / FRONTIER</p><h2>最新前沿信号</h2></div>
-      <p>每条情报都拆成事实、影响与不确定性。<br />先看原始证据，再形成判断。</p>
-      <a href={`${base}/frontier/`}>全部情报 →</a>
-    </div>
-    <div class="intel-grid home-intel">
-      {recent.slice(0, 3).map((item, index) => <FrontierCard item={item} featured={index === 0} />)}
+  <section class="workbench-section shell">
+    <header class="section-header">
+      <div><p class="section-code">02 / RESEARCH MAP</p><h2>六个研究域</h2></div>
+      <p>前沿事件与课程使用同一 taxonomy，避免新闻流和知识体系彼此割裂。</p>
+      <a href={`${base}/learn/`}>进入课程体系 →</a>
+    </header>
+    <DomainMatrix tracks={tracks} lessons={lessons} frontier={frontier} />
+  </section>
+
+  <section class="workbench-section shell">
+    <header class="section-header compact-heading">
+      <div><p class="section-code">03 / CURRICULUM</p><h2>四阶段能力路径</h2></div>
+      <p>每个阶段都要求能够解释机制、定位代码、做实验并形成工程判断。</p>
+    </header>
+    <div class="stage-grid">
+      {stages.map((stage, stageIndex) => (
+        <article class="stage-card">
+          <div class="stage-number">{String(stageIndex + 1).padStart(2, '0')}</div>
+          <h3>{stage.split(' · ')[1]}</h3>
+          <ul>
+            {tracks.filter(track => track.stage === stage).map(track => (
+              <li><a href={`${base}/learn/#${track.id}`}><strong>{track.title}</strong><span>{track.outcomes[0]}</span></a></li>
+            ))}
+          </ul>
+        </article>
+      ))}
     </div>
   </section>
 
-  <section class="section shell learning-section">
-    <div class="section-heading">
-      <div><p class="eyebrow">02 / LEARNING</p><h2>关键技术学习图谱</h2></div>
-      <p>从模型原理走到生产系统。每节课都包含概念地图、代码脉络、工程意义和自检问题。</p>
-      <a href={`${base}/learn/`}>查看路线 →</a>
-    </div>
-    <div class="track-grid">
-      {tracks.map(track => <TrackCard track={track} count={lessons.filter(lesson => lesson.track === track.id).length} />)}
-    </div>
-  </section>
-
-  <section class="editorial shell">
-    <div><p class="eyebrow">EDITORIAL LOOP</p><h2>先回顾，再计划，最后更新。</h2></div>
-    <ol>
-      <li><span>09:00</span><strong>前沿班次</strong><p>回顾全站与过去 12 小时一手信号，决定新增、修订或保持沉默。</p></li>
-      <li><span>21:00</span><strong>学习班次</strong><p>复盘当天内容与路线缺口，推进技术连载或补齐证据链。</p></li>
-    </ol>
-    <a href={`${base}/method/`}>阅读我们的来源与方法 →</a>
+  <section class="method-callout shell">
+    <div><p class="section-code">RESEARCH STANDARD</p><h2>来源强，不等于结论自动可信。</h2></div>
+    <p>官方发布可以直接证明“发布方说了什么”，却不能独立证明泛化效果。我们把事实、机制解释、编辑评分和证据边界分开呈现。</p>
+    <a href={`${base}/method/`}>阅读评分方法 →</a>
   </section>
 </Layout>
