@@ -1,0 +1,62 @@
+[
+  {
+    "slug": "kimi-k3-open-frontier-intelligence",
+    "publishedAt": "2026-07-24",
+    "category": "模型",
+    "title": "Kimi K3 把开放模型推进到 3T 级与百万上下文",
+    "summary": "Kimi 发布 2.8T 参数、原生视觉、1M 上下文的 K3，并把 Kimi Delta Attention 与 Attention Residuals 作为架构主轴。",
+    "fact": "官方技术博客披露 2.8T 参数、1M 上下文、16/896 专家激活，以及 KDA、AttnRes 和原生视觉能力。",
+    "impact": "开放权重模型的竞争正在从单纯参数规模转向长上下文状态、稀疏专家和部署系统的共同设计。",
+    "uncertainty": "完整技术报告和权重发布细节仍决定外部团队能否复现其训练与推理效率。",
+    "evidenceLevel": "S",
+    "tags": ["Open Model", "Long Context", "MoE"],
+    "sources": [
+      { "label": "Kimi 官方技术博客", "url": "https://www.kimi.com/blog/kimi-k3", "type": "官方博客" }
+    ]
+  },
+  {
+    "slug": "claude-opus-5-release",
+    "publishedAt": "2026-07-24",
+    "category": "模型",
+    "title": "Anthropic 发布 Claude Opus 5，前沿能力进入成本重排",
+    "summary": "Claude Opus 5 以接近更高阶模型的能力和更低价格进入全平台，模型选择开始更多由任务经济性决定。",
+    "fact": "Anthropic 宣布 Claude Opus 5 已上线 API 与各平台，价格为每百万输入 token 5 美元、输出 token 25 美元。",
+    "impact": "前沿模型的价值判断会从单榜单分数转向单位成本、长任务可靠性和可控推理预算。",
+    "uncertainty": "官方发布信息不足以独立证明所有真实工作负载上的能力—价格优势，需要第三方、同预算评测。",
+    "evidenceLevel": "S",
+    "tags": ["Frontier Model", "Economics", "API"],
+    "sources": [
+      { "label": "Anthropic 官方发布", "url": "https://www.anthropic.com/news/claude-opus-5", "type": "官方博客" }
+    ]
+  },
+  {
+    "slug": "llm-d-cooperative-time-slicing-rl",
+    "publishedAt": "2026-07-23",
+    "category": "AI Infra",
+    "title": "llm-d 用协作式时间切片填补 Agentic RL 的 GPU 空洞",
+    "summary": "Google Cloud 在 llm-d 中把 rollout 与训练阶段变成可调度单元，让不同 RL 作业交错利用同一批加速器。",
+    "fact": "官方文章报告聚合加速器利用率从约 40% 提升到 70%，并公开 Snapshot Agent、调度器和客户端组件。",
+    "impact": "Agentic RL 的瓶颈不只在算法和显存，也在采样—训练交替造成的结构性空闲；调度层开始进入优化主战场。",
+    "uncertainty": "收益依赖作业互补性、快照恢复成本与隔离机制，跨硬件和大规模生产稳定性仍待验证。",
+    "evidenceLevel": "S",
+    "tags": ["RL Infra", "GPU Utilization", "Scheduling"],
+    "sources": [
+      { "label": "Google Cloud 官方博客", "url": "https://cloud.google.com/blog/products/containers-kubernetes/introducing-co-operative-time-slicing-for-rl-in-llm-d", "type": "官方工程博客" }
+    ]
+  },
+  {
+    "slug": "amd-instella-moe-open-stack",
+    "publishedAt": "2026-07-24",
+    "category": "开放生态",
+    "title": "AMD 用 Instella-MoE 展示全开放 MoE 训练栈",
+    "summary": "Instella-MoE 公开 16B 总参数、2.8B 激活参数模型的多阶段权重、配置、数据混合与代码。",
+    "fact": "AMD 官方说明模型在 MI300X/MI325X 与 ROCm 栈上从头训练，并包含 Gated MLA、FarSkip-Collective 和 64K 长上下文阶段。",
+    "impact": "开放模型的价值开始从最终权重扩展到训练轨迹、硬件栈与通信优化的可复现性。",
+    "uncertainty": "技术报告尚未发布，性能结论当前主要来自开发方披露；跨硬件复现成本仍不明确。",
+    "evidenceLevel": "S",
+    "tags": ["MoE", "ROCm", "Open Training"],
+    "sources": [
+      { "label": "AMD ROCm 官方技术博客", "url": "https://rocm.blogs.amd.com/artificial-intelligence/instella-moe/README.html", "type": "官方工程博客" }
+    ]
+  }
+]

@@ -1,0 +1,30 @@
+---
+import Layout from '../../components/Layout.astro';
+import lessons from '../../data/lessons.json';
+import tracks from '../../data/tracks.json';
+
+export function getStaticPaths() {
+  return lessons.map(lesson => ({ params: { slug: lesson.slug }, props: { lesson } }));
+}
+
+const { lesson } = Astro.props;
+const track = tracks.find(item => item.id === lesson.track);
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Layout title={`${lesson.title}｜AI Frontier Atlas`} description={lesson.description}>
+  <article class="lesson-page shell">
+    <nav class="breadcrumb"><a href={`${base}/learn/`}>学习图谱</a><span>/</span><a href={`${base}/learn/#${track?.id}`}>{track?.title}</a></nav>
+    <header class="lesson-hero">
+      <div><span class="lesson-track">{track?.number} · {track?.title}</span><span>{lesson.difficulty}</span><span>{lesson.duration}</span></div>
+      <h1>{lesson.title}</h1>
+      <p>{lesson.description}</p>
+      <time datetime={lesson.updatedAt}>更新于 {lesson.updatedAt}</time>
+    </header>
+    <section class="lesson-block concept"><span class="block-index">01</span><div><p class="eyebrow">CONCEPT MAP</p><h2>概念地图</h2><ul>{lesson.conceptMap.map(item => <li>{item}</li>)}</ul></div></section>
+    <section class="lesson-block code"><span class="block-index">02</span><div><p class="eyebrow">CODE PATH</p><h2>代码脉络</h2><ol>{lesson.codePath.map(item => <li>{item}</li>)}</ol></div></section>
+    <section class="lesson-block engineering"><span class="block-index">03</span><div><p class="eyebrow">ENGINEERING</p><h2>工程意义</h2><ul>{lesson.engineeringMeaning.map(item => <li>{item}</li>)}</ul></div></section>
+    <section class="lesson-block self-check"><span class="block-index">04</span><div><p class="eyebrow">SELF CHECK</p><h2>自检问题</h2><ol>{lesson.selfCheck.map(item => <li>{item}</li>)}</ol></div></section>
+    <section class="lesson-sources"><p class="eyebrow">PRIMARY SOURCES</p><h2>原始资料</h2>{lesson.sources.map(source => <a href={source.url} target="_blank" rel="noreferrer">{source.label}<span>↗</span></a>)}</section>
+  </article>
+</Layout>

@@ -1,0 +1,72 @@
+---
+import Layout from '../components/Layout.astro';
+import FrontierCard from '../components/FrontierCard.astro';
+import TrackCard from '../components/TrackCard.astro';
+import frontier from '../data/frontier.json';
+import tracks from '../data/tracks.json';
+import lessons from '../data/lessons.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const recent = [...frontier].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+const latestDate = recent[0]?.publishedAt;
+---
+
+<Layout title="AI Frontier Atlas｜前沿图谱" description="独立的全球 AI 前沿追踪与关键技术系统学习网站。">
+  <section class="hero shell">
+    <div class="hero-grid">
+      <div class="hero-main">
+        <p class="eyebrow"><span class="live-dot"></span> INTELLIGENCE, NOT NOISE</p>
+        <h1>追踪 AI 前沿，<br /><em>建立技术坐标系。</em></h1>
+        <p class="hero-lead">把全球 AI 新进展压缩成可验证的工程信号，再把关键技术接成系统、高效、能落地的学习路径。</p>
+        <div class="hero-actions">
+          <a class="button primary" href={`${base}/frontier/`}>浏览前沿情报 <span>↗</span></a>
+          <a class="button ghost" href={`${base}/learn/`}>进入学习图谱 <span>→</span></a>
+        </div>
+      </div>
+      <aside class="hero-console">
+        <div class="console-head"><span>ATLAS STATUS</span><span class="status-ok">ONLINE</span></div>
+        <dl>
+          <div><dt>前沿信号</dt><dd>{frontier.length.toString().padStart(2, '0')}</dd></div>
+          <div><dt>学习路线</dt><dd>{tracks.length.toString().padStart(2, '0')}</dd></div>
+          <div><dt>技术课程</dt><dd>{lessons.length.toString().padStart(2, '0')}</dd></div>
+          <div><dt>最近更新</dt><dd class="date-value">{latestDate}</dd></div>
+        </dl>
+        <p>下一次维护窗口 <strong>21:00 CST</strong></p>
+      </aside>
+    </div>
+    <div class="hero-ticker" aria-label="关注领域">
+      <span>MODELS</span><i></i><span>AI INFRA</span><i></i><span>AGENTS</span><i></i><span>MULTIMODAL</span><i></i><span>EVALUATION</span>
+    </div>
+  </section>
+
+  <section class="section shell">
+    <div class="section-heading">
+      <div><p class="eyebrow">01 / FRONTIER</p><h2>最新前沿信号</h2></div>
+      <p>每条情报都拆成事实、影响与不确定性。<br />先看原始证据，再形成判断。</p>
+      <a href={`${base}/frontier/`}>全部情报 →</a>
+    </div>
+    <div class="intel-grid home-intel">
+      {recent.slice(0, 3).map((item, index) => <FrontierCard item={item} featured={index === 0} />)}
+    </div>
+  </section>
+
+  <section class="section shell learning-section">
+    <div class="section-heading">
+      <div><p class="eyebrow">02 / LEARNING</p><h2>关键技术学习图谱</h2></div>
+      <p>从模型原理走到生产系统。每节课都包含概念地图、代码脉络、工程意义和自检问题。</p>
+      <a href={`${base}/learn/`}>查看路线 →</a>
+    </div>
+    <div class="track-grid">
+      {tracks.map(track => <TrackCard track={track} count={lessons.filter(lesson => lesson.track === track.id).length} />)}
+    </div>
+  </section>
+
+  <section class="editorial shell">
+    <div><p class="eyebrow">EDITORIAL LOOP</p><h2>先回顾，再计划，最后更新。</h2></div>
+    <ol>
+      <li><span>09:00</span><strong>前沿班次</strong><p>回顾全站与过去 12 小时一手信号，决定新增、修订或保持沉默。</p></li>
+      <li><span>21:00</span><strong>学习班次</strong><p>复盘当天内容与路线缺口，推进技术连载或补齐证据链。</p></li>
+    </ol>
+    <a href={`${base}/method/`}>阅读我们的来源与方法 →</a>
+  </section>
+</Layout>

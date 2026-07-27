@@ -1,0 +1,37 @@
+---
+import Layout from '../../components/Layout.astro';
+import FrontierCard from '../../components/FrontierCard.astro';
+import frontier from '../../data/frontier.json';
+
+const items = [...frontier].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+const categories = ['全部', ...new Set(items.map(item => item.category))];
+---
+
+<Layout title="前沿情报流｜AI Frontier Atlas" description="带原始来源、证据等级和不确定性边界的全球 AI 前沿情报。">
+  <section class="page-hero shell compact">
+    <p class="eyebrow"><span class="live-dot"></span> GLOBAL AI FRONTIER</p>
+    <h1>前沿情报流</h1>
+    <p>我们不追踪所有新闻，只记录会改变模型能力、成本结构、开发范式或产业边界的技术信号。</p>
+  </section>
+  <section class="shell frontier-toolbar" aria-label="情报筛选">
+    <div class="filter-row">
+      {categories.map((category, index) => <button class:list={{ active: index === 0 }} data-filter={category}>{category}</button>)}
+    </div>
+    <p><strong>{items.length}</strong> 条已核实信号 · S/A 级证据</p>
+  </section>
+  <section class="shell intel-grid frontier-list" id="frontier-list">
+    {items.map(item => <FrontierCard item={item} />)}
+  </section>
+  <script is:inline>
+    document.querySelectorAll('[data-filter]').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter]').forEach((item) => item.classList.remove('active'));
+        button.classList.add('active');
+        const value = button.dataset.filter;
+        document.querySelectorAll('[data-category]').forEach((card) => {
+          card.hidden = value !== '全部' && card.dataset.category !== value;
+        });
+      });
+    });
+  </script>
+</Layout>

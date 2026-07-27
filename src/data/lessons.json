@@ -1,0 +1,101 @@
+[
+  {
+    "slug": "kv-cache-to-continuous-batching",
+    "track": "inference",
+    "order": 1,
+    "updatedAt": "2026-07-27",
+    "title": "从 KV Cache 到 Continuous Batching",
+    "description": "沿一次自回归请求的数据流，理解显存、调度与吞吐为何必须共同优化。",
+    "difficulty": "进阶",
+    "duration": "35 分钟",
+    "conceptMap": [
+      "自回归 decode 每步只生成一个 token，却需要读取所有历史 K/V。",
+      "PagedAttention 解决 KV 内存碎片，Continuous Batching 解决请求生命周期不一致造成的算力空洞。",
+      "吞吐、首 token 延迟与单 token 延迟是三个不同目标。"
+    ],
+    "codePath": [
+      "从请求调度器观察 waiting/running/swapped 队列如何迁移。",
+      "沿 block table 追踪逻辑 KV block 到物理显存 block 的映射。",
+      "对比 prefill 与 decode 的张量形状和算术强度。"
+    ],
+    "engineeringMeaning": [
+      "批越大不一定越好：decode 延迟、KV 容量和抢占成本会共同限制有效 batch。",
+      "Serving 优化应同时记录 TTFT、TPOT、吞吐、KV 使用率和请求完成率。"
+    ],
+    "selfCheck": [
+      "为什么传统静态 batching 会被最长请求拖住？",
+      "PagedAttention 改善的是计算复杂度还是内存管理？",
+      "当 KV cache 接近满载时，调度器有哪些可选策略？"
+    ],
+    "sources": [
+      { "label": "Kwon et al., Efficient Memory Management for LLM Serving with PagedAttention", "url": "https://arxiv.org/abs/2309.06180" },
+      { "label": "vLLM 官方文档", "url": "https://docs.vllm.ai/" }
+    ]
+  },
+  {
+    "slug": "agent-state-verification-recovery",
+    "track": "agent",
+    "order": 1,
+    "updatedAt": "2026-07-27",
+    "title": "Agent 的状态、验证与失败恢复",
+    "description": "把 Agent 从“会调用工具”推进到可观察、可中断、可验证和可恢复的生产系统。",
+    "difficulty": "进阶",
+    "duration": "40 分钟",
+    "conceptMap": [
+      "模型负责提出动作，Harness 负责状态、权限、工具执行和终止条件。",
+      "最终答案正确不代表过程安全；工具副作用和恢复路径必须单独评测。",
+      "长任务状态应区分上下文、外部工作记忆和持久业务状态。"
+    ],
+    "codePath": [
+      "定义 plan、act、observe、verify、recover 五类事件的统一 trace envelope。",
+      "给每个有副作用工具增加幂等键、前置条件和执行后验证。",
+      "把一次生产失败转成含预期工具序列与禁止动作的回放用例。"
+    ],
+    "engineeringMeaning": [
+      "生产可靠性更多来自 Harness，而不是把 system prompt 写得更长。",
+      "显式状态机让中断、重试、审批和成本归因成为可测试行为。"
+    ],
+    "selfCheck": [
+      "哪些信息应留在模型上下文，哪些应写入外部状态？",
+      "如何证明一次重试不会重复扣款或重复发布？",
+      "为什么只比较最终答案会漏掉高风险回归？"
+    ],
+    "sources": [
+      { "label": "Anthropic, Building effective agents", "url": "https://www.anthropic.com/research/building-effective-agents" },
+      { "label": "OpenAI Agents SDK 文档", "url": "https://openai.github.io/openai-agents-python/" }
+    ]
+  },
+  {
+    "slug": "moe-from-routing-to-all-to-all",
+    "track": "foundation",
+    "order": 1,
+    "updatedAt": "2026-07-27",
+    "title": "MoE：从路由公式到 All-to-All 瓶颈",
+    "description": "理解稀疏专家为何节省每 token 计算，却把系统压力转移到负载均衡和跨卡通信。",
+    "difficulty": "进阶",
+    "duration": "45 分钟",
+    "conceptMap": [
+      "Router 为每个 token 选择少量专家，总参数与激活参数因此解耦。",
+      "Expert Parallel 需要把 token 发送到专家所在设备，形成 All-to-All 通信。",
+      "容量因子、辅助损失和路由策略共同决定丢 token、负载与质量。"
+    ],
+    "codePath": [
+      "沿 router logits → top-k → dispatch → expert MLP → combine 跟踪张量。",
+      "记录每专家 token 数、跨节点流量、通信重叠率和尾部延迟。",
+      "比较专家放置、分组路由和通信—计算重叠策略。"
+    ],
+    "engineeringMeaning": [
+      "MoE 的 FLOPs 优势不会自动变成 wall-clock 优势；网络拓扑可能成为主瓶颈。",
+      "优化目标应从单 GPU 算力扩展到每瓦、每卡和每机架的有效 token。"
+    ],
+    "selfCheck": [
+      "总参数相同的 MoE 与 Dense 模型为什么每 token 成本不同？",
+      "专家负载不均会如何同时影响吞吐和模型质量？",
+      "哪些通信可以和专家计算重叠？"
+    ],
+    "sources": [
+      { "label": "DeepSeek-V3 Technical Report", "url": "https://arxiv.org/abs/2412.19437" },
+      { "label": "NVIDIA, Scaling MoE pre-training on GB300 NVL72", "url": "https://developer.nvidia.com/blog/setting-a-world-record-for-moe-pre-training-on-nvidia-gb300-nvl72/" }
+    ]
+  }
+]

@@ -1,0 +1,14 @@
+---
+interface Track { id: string; number: string; title: string; description: string; color: string }
+interface Props { track: Track; count: number }
+const { track, count } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<a class={`track-card color-${track.color}`} href={`${base}/learn/#${track.id}`}>
+  <span class="track-number">{track.number}</span>
+  <span class="track-count">{count} 节</span>
+  <h3>{track.title}</h3>
+  <p>{track.description}</p>
+  <span class="track-arrow">进入路线 →</span>
+</a>

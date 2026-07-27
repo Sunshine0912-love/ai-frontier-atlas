@@ -1,0 +1,28 @@
+---
+import Layout from '../../components/Layout.astro';
+---
+
+<Layout title="来源与方法｜AI Frontier Atlas" description="AI Frontier Atlas 的来源分级、判断边界和双更维护方法。">
+  <section class="page-hero shell compact method-hero">
+    <p class="eyebrow">EDITORIAL STANDARD</p>
+    <h1>来源与方法</h1>
+    <p>速度不是牺牲准确性的理由。每轮更新先回顾当前站点，再计划行动；每个重要结论都能回到证据。</p>
+  </section>
+  <section class="method-grid shell">
+    <article><span>S</span><h2>原始证据</h2><p>论文、官方技术报告、源码、模型卡、评测仓库、监管文件。可以直接支撑事实陈述。</p></article>
+    <article><span>A</span><h2>可靠解释</h2><p>作者演讲、机构工程博客、可复现实验和方法透明的数据分析。用于补充上下文。</p></article>
+    <article><span>B</span><h2>线索来源</h2><p>媒体、社区和社交内容。只用于发现线索，不独立支撑关键技术结论。</p></article>
+  </section>
+  <section class="judgement shell">
+    <div><p class="eyebrow">CLAIM BOUNDARIES</p><h2>三层表达边界</h2></div>
+    <ol>
+      <li><span>FACT</span><div><strong>事实</strong><p>来源直接写明、可以被他人复核的内容。</p></div></li>
+      <li><span>INFERENCE</span><div><strong>推断</strong><p>从多个事实推出的解释，必须展示推导链。</p></div></li>
+      <li><span>VIEW</span><div><strong>判断</strong><p>面向工程或产业的可证伪观点，明确不确定性。</p></div></li>
+    </ol>
+  </section>
+  <section class="maintenance-loop shell">
+    <p class="eyebrow">TWICE-DAILY LOOP</p><h2>每次维护都从回顾开始</h2>
+    <div>{['回顾全站', '生成缺口', '制定计划', '研究与编辑', '测试与发布', '记录下一步'].map((item, index) => <span><i>{String(index + 1).padStart(2, '0')}</i>{item}</span>)}</div>
+  </section>
+</Layout>
