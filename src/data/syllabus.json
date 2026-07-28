@@ -9,7 +9,7 @@
   {"track":"foundation","order":8,"title":"架构阅读法：从配置到一次完整前向","focus":"建立读取模型配置、模块树、张量形状和计算图的方法。","status":"planned"},
 
   {"track":"multimodal","order":1,"title":"CLIP：用对比学习建立图文共享坐标系","focus":"推导双塔对比损失并诊断零样本迁移的边界。","status":"available","slug":"clip-contrastive-multimodal-learning"},
-  {"track":"multimodal","order":2,"title":"视觉 Token：ViT 与图像离散化","focus":"理解 patch embedding、位置表示与视觉 token 预算。","status":"planned"},
+  {"track":"multimodal","order":2,"title":"视觉 Token：ViT 与图像离散化","focus":"理解 patch embedding、位置表示与视觉 token 预算。","status":"available","slug":"vision-tokens-vit-image-tokenization"},
   {"track":"multimodal","order":3,"title":"跨模态连接器：投影层、Q-Former 与适配器","focus":"比较将视觉表示接入语言模型的主要接口设计。","status":"planned"},
   {"track":"multimodal","order":4,"title":"多模态指令微调：数据配比与对齐","focus":"分析图文指令数据、模板与能力退化之间的关系。","status":"planned"},
   {"track":"multimodal","order":5,"title":"扩散模型：噪声预测与采样过程","focus":"从前向加噪、反向去噪到条件引导建立完整推导。","status":"planned"},

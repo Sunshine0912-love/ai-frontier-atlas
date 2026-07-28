@@ -5,13 +5,13 @@ const required = [
   ['dist/index.html', '研究工作台'],
   ['dist/frontier/index.html', '信号矩阵'],
   ['dist/learn/index.html', '四阶段'],
-  ['dist/method/index.html', '评分方法'],
-  ['dist/learn/kv-cache-to-continuous-batching/index.html', '动手实验'],
-  ['dist/learn/transformer-attention-tensors-complexity/index.html', '注意力的张量'],
-  ['dist/learn/preference-alignment-from-rlhf-to-dpo/index.html', '偏好对齐'],
-  ['dist/learn/clip-contrastive-multimodal-learning/index.html', '对比学习'],
-  ['dist/learn/holistic-llm-evaluation/index.html', '整体评测']
+  ['dist/method/index.html', '评分方法']
 ];
+
+const lessons = JSON.parse(readFileSync(resolve('src/data/lessons.json'), 'utf8'));
+for (const lesson of lessons) {
+  required.push([`dist/learn/${lesson.slug}/index.html`, lesson.title]);
+}
 
 for (const [file, marker] of required) {
   const absolute = resolve(file);

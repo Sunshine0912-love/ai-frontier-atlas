@@ -1,19 +1,19 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-28T01:07:01.961Z",
+  "generatedAt": "2026-07-28T13:06:59.961Z",
   "summary": {
     "frontierItems": 5,
-    "lessons": 7,
+    "lessons": 8,
     "tracks": 6,
     "latestFrontierDate": "2026-07-27",
-    "latestLessonDate": "2026-07-27"
+    "latestLessonDate": "2026-07-28"
   },
   "quality": {
     "frontierScoreCoverage": "5/5",
-    "deepLessonCoverage": "7/7",
-    "researchArticleCoverage": "7/7",
+    "deepLessonCoverage": "8/8",
+    "researchArticleCoverage": "8/8",
     "syllabusCoverage": "6/6",
-    "directReferences": 30
+    "directReferences": 35
   },
   "categoryCoverage": {
     "物理 AI": 1,
@@ -35,11 +35,11 @@
     {
       "id": "multimodal",
       "title": "多模态表示",
-      "lessons": 1,
+      "lessons": 2,
       "planned": 6,
-      "readiness": "1/6",
-      "latest": "2026-07-27",
-      "daysSinceLatest": 1
+      "readiness": "2/6",
+      "latest": "2026-07-28",
+      "daysSinceLatest": 0
     },
     {
       "id": "training",

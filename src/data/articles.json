@@ -215,6 +215,76 @@
     "takeaways":["CLIP 学的是跨模态相似度，不是图像描述生成。","N×N 相似度矩阵同时提供正对和 batch 内负样本。","零样本分类器由文本原型动态定义，必须报告模板。","真实应用要用失败切片验证模型是否依赖正确证据。"]
   },
   {
+    "slug": "vision-tokens-vit-image-tokenization",
+    "chapters": [
+      {
+        "id": "problem",
+        "title": "问题设定：像素怎样进入 Transformer",
+        "paragraphs": [
+          "语言模型天然处理 token 序列，而图像最初是二维像素网格。要让 Transformer 读图，第一步不是注意力，而是把连续像素拆成有限长度的视觉序列。ViT 的关键假设很直接：把图像切成固定大小 patch，每个 patch 类比一句话里的一个词，再用线性投影得到连续向量 token。这样标准 Transformer block 可以几乎原样用于视觉任务。[1]",
+          "这个转写看似简单，却决定了后面所有成本。分辨率越高、patch 越小，token 数越多；token 数进入注意力后会二次增长。多模态模型把图像 token 接进语言上下文时，视觉 token 还会挤占文本 token、工具轨迹和长上下文预算。研究视觉 token 的目的不是背一个 ViT 架构图，而是知道每一次切 patch、压缩、离散化和 mask 都在改变信息、成本与接口。"
+        ]
+      },
+      {
+        "id": "baseline",
+        "title": "基线：CNN 特征图与全图向量的取舍",
+        "paragraphs": [
+          "在 ViT 之前，常见做法是用 CNN 提取多层特征图，再通过池化或区域特征交给分类头、检测头或图文模型。CNN 的归纳偏置强，局部平移等变和分层下采样让它在中小数据上更稳；但如果只把最终全图向量交给语言侧，局部实体、空间关系和细粒度属性会被过早压缩。",
+          "ViT patch token 给了另一种接口：每个 patch 都保留为序列元素，注意力可以全局混合，后续连接器也能选择保留、压缩或查询这些 token。代价是局部结构不再免费，需要数据规模、增强、位置编码和训练目标补回来。因此工程上不要把“视觉 token 化”理解为天然更好，它是把视觉信息暴露给序列模型的一种预算分配方式。"
+        ]
+      },
+      {
+        "id": "patch",
+        "title": "Patch Embedding：从 [B,C,H,W] 到 [B,N,D]",
+        "paragraphs": [
+          "给定图像 X∈R^(B×C×H×W)，选择 patch size P 后，每张图被切成 N=(H/P)·(W/P) 个不重叠 patch。每个 patch 展平成长度 C·P^2 的向量，再乘以 W_patch∈R^(C·P^2×D) 得到 D 维 token。实际代码常用 Conv2d(kernel_size=P,stride=P,out_channels=D) 实现同一操作，因为卷积会在不重叠窗口上共享同一个线性投影。",
+          "ViT 还会在序列前加入可学习 class token，并为每个位置加 position embedding。class token 是一个供全局汇聚使用的槽位；position embedding 则补回 patch 序列中丢失的二维位置。若训练分辨率和推理分辨率不同，位置编码通常需要插值，这一步会影响高分辨率迁移。读源码时应从 patch_embed、cls_token、pos_embed 和 interpolate_pos_encoding 开始，而不是先看深层 block。"
+        ]
+      },
+      {
+        "id": "masking",
+        "title": "Masked Image Modeling：为什么 MAE 只编码可见 patch",
+        "paragraphs": [
+          "MAE 把图像随机遮掉大比例 patch，只把可见 patch 送入编码器，然后用轻量 decoder 和 mask token 重建被遮盖区域。[2] 这与语言 BERT 类似，但视觉有一个重要差别：自然图像局部冗余很高，如果 mask 比例太低，模型可能靠邻近纹理完成任务，学不到强表示。MAE 使用高 mask ratio，让编码器必须从稀疏可见区域恢复结构。",
+          "只编码可见 patch 也有工程意义。假设保留比例为 r，编码器序列长度从 N 变成 rN，注意力关系数量近似从 N^2 变成 r^2N^2。decoder 可以更浅、更窄，因为它只负责重建训练目标，不必成为最终表示。这个设计说明 token 化不仅是输入格式，也是训练成本控制面：哪些 token 进入重编码器，哪些 token 只在辅助目标中出现，会改变可扩展性。"
+        ]
+      },
+      {
+        "id": "discrete",
+        "title": "图像离散化：Codebook Token 不是 Patch Embedding",
+        "paragraphs": [
+          "连续 patch embedding 输出的是浮点向量，保留在模型隐藏空间中；离散视觉 token 则先训练 tokenizer 或 codebook，把局部图像块映射成整数 id。BEiT 使用离散视觉 token 作为 masked image modeling 的预测目标，VQ-VAE 类方法也通过向量量化把连续编码映射到有限词表。[5] 这种表示便于像语言 token 一样做分类预测或自回归生成。",
+          "但离散化一定带来信息瓶颈。codebook 太小会损失细节，太大又提高建模难度；tokenizer 的训练数据和重建目标会决定哪些视觉差异被保留。小光判断：在多模态理解里，连续 token 通常更适合作为感知特征；在图像生成、压缩或统一离散序列建模里，离散 token 更自然。事实是论文展示了这些目标的可行性；推断是不同 token 形式会改变下游接口；判断是不要在系统设计中把两者混称为“视觉 token”。"
+        ]
+      },
+      {
+        "id": "modern-backbone",
+        "title": "现代视觉骨干：DINOv2 给工程阅读的线索",
+        "paragraphs": [
+          "DINOv2 说明 ViT token 化已经不只是监督分类前端，而可以成为通用视觉特征骨干。[3] 官方代码中 prepare_tokens_with_masks、patch_embed、pos_embed 插值和 register token 等路径，展示了现代视觉模型如何围绕 token 序列组织训练和特征输出。[4] 读这类代码时，关键是确认每个 token 的身份：class token、patch token、register token、mask token 是否都进入同一个 block，最后下游取哪一部分特征。",
+          "在多模态系统里，视觉骨干通常不会把所有 patch 原样塞给语言模型。常见做法包括投影层、resampler、Q-Former、Perceiver-style pooling 或 token pruning。它们都在回答同一个问题：保留多少视觉 token，压缩到什么维度，牺牲哪些局部细节，换取多少语言上下文和推理速度。ViT 课程的价值就在于给后续连接器课程提供可计算的输入预算。"
+        ]
+      },
+      {
+        "id": "boundaries",
+        "title": "失败边界：分辨率、位置和评价错觉",
+        "paragraphs": [
+          "视觉 token 化的第一个边界是分辨率。增大图像尺寸会迅速增加 token 数；增大 patch size 虽能降成本，却可能丢失小物体、文字和细粒度纹理。第二个边界是位置。绝对位置编码在分辨率外推时需要插值，二维结构被展平成一维序列后，模型需要通过编码和数据重新学习相邻关系。第三个边界是评价：分类准确率高不等于 token 对空间、计数、文字和物理细节都有稳定表示。",
+          "工程验收应把 token 预算写成表，而不是只说“支持高分辨率”。至少报告输入分辨率、patch size、token 数、视觉侧压缩比例、语言侧上下文占用和关键失败切片。做实验时可以从 224×224 和 P=16 的 196 个 patch 开始，再扩大到 336 或 448，观察显存、延迟和小物体召回的变化。只有这样，视觉 token 才从架构名词变成可运营的系统参数。"
+        ]
+      }
+    ],
+    "formulas": [
+      {"afterChapter":"patch","label":"Patch token 数量","latex":"N=\\frac{H}{P}\\cdot\\frac{W}{P}","symbols":["H,W：输入图像高和宽","P：patch 边长","N：不含 class token 的视觉 token 数"],"intuition":"分辨率线性放大到高和宽两个方向，token 数按面积增长；patch 越小，序列越长。"},
+      {"afterChapter":"patch","label":"Patch embedding 投影","latex":"Z_i=\\operatorname{vec}(X_i)W_{patch}+b","symbols":["X_i：第 i 个 C×P×P patch","W_{patch}：线性投影矩阵","Z_i：第 i 个连续视觉 token"],"intuition":"Conv2d(kernel=stride=P) 可以等价实现这一步；输出不是离散 id，而是浮点隐藏向量。"},
+      {"afterChapter":"masking","label":"可见 token 注意力成本","latex":"\\operatorname{Cost}_{visible}\\propto (rN)^2","symbols":["r：保留 patch 比例","N：完整 patch token 数","rN：进入 encoder 的可见 token 数"],"intuition":"MAE 通过只编码可见 token，把编码器注意力关系数量按保留比例平方缩小。"}
+    ],
+    "workedExample":{"title":"计算 224 图像的视觉 token 预算","steps":["对 224×224 图像取 P=16，得到 N=14×14=196 个 patch，加 class token 后序列长度为 197。","把分辨率改成 448×448 且 P 不变，N 变成 28×28=784，注意力关系数量约增加 16 倍。","若 MAE 保留 25% patch，编码器只处理约 49 个 patch token，但 decoder 仍需恢复完整网格。"],"result":"同一骨干在分辨率、patch size 和 mask ratio 变化下，成本不是线性变化；token 数是最先要算清的工程量。"},
+    "implementationMap":[{"concept":"Patch embedding","code":"PatchEmbed / Conv2d(kernel=stride=patch_size)","note":"核对输入分辨率、flatten 后的 N 和输出维度 D。"},{"concept":"位置与特殊 token","code":"cls_token + pos_embed + interpolate_pos_encoding","note":"确认 class token、register token 和 patch token 的拼接顺序。"},{"concept":"Masked image modeling","code":"random_masking → visible tokens → decoder mask tokens","note":"区分 encoder 序列和 decoder 重建序列。"},{"concept":"离散视觉目标","code":"visual tokenizer / codebook ids","note":"确认 codebook 大小、量化误差和预测目标是否只用于预训练。"}],
+    "limitations":["Patch 越大，局部细节和小物体越容易被压缩掉。","绝对位置编码在新分辨率上需要插值，可能带来外推误差。","离散 codebook token 会引入量化误差，不能等同于原始像素信息。","把所有 patch token 接入语言模型会快速消耗上下文和推理预算。"],
+    "takeaways":["ViT 的视觉 token 是连续 patch embedding，不是天然离散词表。","token 数由分辨率和 patch size 决定，是成本估算的第一行。","MAE 通过只编码可见 patch 同时获得自监督目标和训练成本优势。","多模态连接器本质上是在视觉信息保真和语言上下文预算之间做工程取舍。"]
+  },
+  {
     "slug": "preference-alignment-from-rlhf-to-dpo",
     "chapters": [
       {

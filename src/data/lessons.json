@@ -109,6 +109,44 @@
     ]
   },
   {
+    "slug": "vision-tokens-vit-image-tokenization",
+    "track": "multimodal",
+    "order": 2,
+    "updatedAt": "2026-07-28",
+    "title": "视觉 Token：ViT 与图像离散化",
+    "description": "从 patch embedding、位置编码和 mask 重建出发，区分连续视觉 token 与离散 codebook token，并建立多模态接口的 token 预算意识。",
+    "difficulty": "进阶",
+    "duration": "85 分钟",
+    "objectives": ["推导 ViT patch token 的形状、数量和计算预算", "解释 class token、position embedding 与 masked image modeling 的作用", "区分连续 patch embedding、离散 codebook token 与下游多模态 token 压缩"],
+    "prerequisites": ["Transformer 自注意力", "CLIP 图文对比学习", "卷积和图像张量基础"],
+    "keyTerms": ["patch embedding", "class token", "position embedding", "masked image modeling", "visual tokenizer", "codebook"],
+    "conceptMap": ["ViT 把图像切成固定大小 patch，再用线性投影把每个 patch 变成连续向量 token。", "视觉 token 数量由分辨率和 patch size 决定，它会直接进入注意力的二次复杂度和多模态上下文预算。", "图像离散化把局部图像块映射到 codebook id，适合生成或重建目标，但它和 ViT 的连续 patch embedding 不是同一种表示。"],
+    "mentalModel": "把一张图送进 Transformer 前，先要决定把连续像素怎样拆成模型可读的序列。ViT 的做法像把图片裁成许多小纸片，每张纸片被压成一个向量，再加上位置线索交给注意力层；离散 tokenizer 则像给每张纸片查一本视觉词典，输出词典编号。前者保留连续特征，后者方便做掩码预测、压缩或生成目标，但两者都会把视觉问题变成 token 预算问题。",
+    "mechanism": ["输入图像 X∈R^(B×C×H×W) 被切成 P×P patch，patch 数 N=(H/P)·(W/P)，每个 patch 展平后乘以投影矩阵得到 [B,N,D]。", "ViT 通常在序列前拼接 class token，并加入 position embedding；随后标准 Transformer block 在所有 patch token 上执行自注意力。", "MAE 随机保留少量可见 patch，在编码器中只处理可见 token，再由轻量 decoder 重建被遮盖 patch；BEiT/VQ 类方法则把图像块映射为离散视觉词表，使用 token id 作为预测目标。"],
+    "codePath": ["从 patch_embed.proj 或 conv stem 读取 kernel_size=stride=patch_size，确认 [B,C,H,W] 到 [B,N,D] 的变换。", "检查 cls_token、pos_embed、interpolate_pos_encoding 和 mask token 的拼接顺序。", "在 DINOv2 或 MAE 代码中跟踪 prepare_tokens / forward_features，记录可见 patch、位置编码和输出特征的形状。"],
+    "tensorFlow": ["images [B,3,H,W] → patches [B,N,3P^2] → patch tokens [B,N,D] → add cls/pos [B,N+1,D]", "mask ids [B,N] → visible tokens [B,N_visible,D] → encoder/decoder → reconstructed patches or features"],
+    "pseudocode": ["patches = unfold(images, patch_size=P)", "tokens = patches @ W_patch + b_patch", "tokens = concat(cls_token, tokens) + pos_embed", "visible, mask = random_mask(tokens, keep_ratio)", "encoded = transformer_encoder(visible)", "decoded = decoder(insert_mask_tokens(encoded, mask))", "loss = mse(decoded_masked_patches, target_masked_patches)"],
+    "engineeringMeaning": ["视觉 token 数量会同时影响训练显存、注意力延迟、多模态上下文长度和图像分辨率上限。", "连续 patch token 更适合作为感知特征，离散 token 更适合重建或生成目标；混用概念会导致错误的接口和评测设计。"],
+    "decisionTable": [
+      { "condition": "需要分类、检索或多模态理解特征", "choose": "连续 ViT patch embedding", "because": "保留丰富连续语义，容易接入 pooling、投影层或 cross-attention" },
+      { "condition": "需要图像重建、生成或离散预测目标", "choose": "VQ/BEiT 类离散视觉 token", "because": "codebook id 可以像语言 token 一样被预测，但会带来量化误差" },
+      { "condition": "高分辨率图像导致上下文过长", "choose": "增大 patch size、分层特征或 token pruning", "because": "减少 N 比单纯优化 kernel 更直接地降低二次注意力成本" }
+    ],
+    "lab": {
+      "title": "计算视觉 token 预算并复现最小 MAE mask",
+      "steps": ["选择 224、336、448 三种分辨率，分别用 P=14 和 P=16 计算 patch token 数与注意力关系数量。", "实现 unfold + linear 的最小 patch embedding，并和 Conv2d(kernel=stride=P) 输出形状对齐。", "随机 mask 75% patch，只让编码器处理可见 token，再检查 decoder 重建目标只在 masked patch 上计算。"],
+      "successCriteria": ["能给出每种分辨率和 patch size 下的 token 数、注意力矩阵大小和主要成本差异。", "能解释连续 patch token 与离散 codebook token 在训练目标和信息损失上的差别。"]
+    },
+    "selfCheck": ["为什么 ViT patch embedding 可以用 Conv2d(kernel_size=stride=patch_size) 实现？", "把 patch size 从 16 改到 14 会如何影响 token 数、注意力成本和局部细节？", "MAE 为什么只把可见 patch 送入 encoder，而不是先编码完整图像再遮盖？", "离散视觉 token 的 codebook 误差会怎样影响下游多模态模型？"],
+    "sources": [
+      { "label": "Dosovitskiy et al., An Image is Worth 16x16 Words", "url": "https://arxiv.org/abs/2010.11929", "type": "原始论文" },
+      { "label": "He et al., Masked Autoencoders Are Scalable Vision Learners", "url": "https://arxiv.org/abs/2111.06377", "type": "原始论文" },
+      { "label": "Oquab et al., DINOv2: Learning Robust Visual Features without Supervision", "url": "https://arxiv.org/abs/2304.07193", "type": "原始论文" },
+      { "label": "Meta Research DINOv2 官方源码", "url": "https://github.com/facebookresearch/dinov2", "type": "官方源码" },
+      { "label": "Bao et al., BEiT: BERT Pre-Training of Image Transformers", "url": "https://arxiv.org/abs/2106.08254", "type": "原始论文" }
+    ]
+  },
+  {
     "slug": "preference-alignment-from-rlhf-to-dpo",
     "track": "training",
     "order": 1,
