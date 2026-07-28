@@ -1,5 +1,29 @@
 [
   {
+    "slug": "nvidia-cosmos-h-dreams-surgical-world-model",
+    "publishedAt": "2026-07-27",
+    "category": "物理 AI",
+    "domain": "multimodal",
+    "stage": "开放发布 · 可运行产物",
+    "organization": "NVIDIA",
+    "title": "Cosmos-H-Dreams 将手术机器人世界模型推进到实时闭环",
+    "summary": "NVIDIA 把行动条件手术视频世界模型蒸馏成可交互的流式模拟器，使生成式仿真从离线 rollout 进入人或策略可实时控制的闭环环境。",
+    "fact": "NVIDIA 在 Hugging Face 发布 Cosmos-H-Dreams 博文、模型卡和代码仓库，说明该模型由 Cosmos-H-Surgical-Simulator 蒸馏而来，面向 dVRK tabletop suturing，输入初始 RGB 帧和 44 维机器人动作流，按 12 帧块自回归生成视频，并通过 FlashDreams 在单张 RTX PRO 6000 上达到约 160 FPS 的交互式服务。",
+    "mechanism": "系统先用双向教师模型学习手术场景的动作条件动态，再通过 causal warmup 与 self-forcing distillation 训练少步扩散学生模型。FlashDreams 负责流式 KV cache、CUDA Graph、torch.compile 与轻量解码，把少步 latent video diffusion 变成 WebRTC / WebXR 可控的低延迟仿真循环。",
+    "impact": "Physical AI 的评估对象开始从离线视频生成迁移到可被人类或策略实时驱动的世界模型环境。若动作响应、长程稳定性和 sim-to-real 相关性成立，稀缺、昂贵且高风险的手术机器人实验可部分转为可复放、可扩展的生成式闭环评测。",
+    "uncertainty": "官方材料给出了模型卡、代码、数据来源和速度数字，但 Cosmos-H-Dreams 技术报告仍标记为 TODO，闭环行为是否能可靠预测真实机器人结果还缺少独立基准；医疗场景的数据权限、安全验证和监管适用性也不能由模型开源自动解决。",
+    "watchNext": "跟踪技术报告、闭环 benchmark、真实策略迁移结果、长 rollout 漂移和工具尖端/姿态一致性指标；复现时同时记录视觉质量、动作可控性、延迟、显存、失败动作响应和真实机器人一致性。",
+    "evidenceLevel": "S",
+    "scores": { "novelty": 4, "impact": 4, "evidence": 4, "reproducibility": 4 },
+    "tags": ["World Model", "Physical AI", "Robotics"],
+    "sources": [
+      { "label": "NVIDIA / Hugging Face 技术博客", "url": "https://huggingface.co/blog/nvidia/cosmos-h-dreams", "type": "官方技术博客", "direct": true },
+      { "label": "Cosmos-H-Dreams 模型卡", "url": "https://huggingface.co/nvidia/Cosmos-H-Dreams", "type": "模型卡", "direct": true },
+      { "label": "Cosmos-H-Dreams 官方源码", "url": "https://github.com/isaac-for-healthcare/Cosmos-H-Dreams", "type": "官方源码", "direct": true },
+      { "label": "FlashDreams 官方源码", "url": "https://github.com/NVIDIA/flashdreams", "type": "官方源码", "direct": true }
+    ]
+  },
+  {
     "slug": "kimi-k3-open-frontier-intelligence",
     "publishedAt": "2026-07-24",
     "category": "模型架构",

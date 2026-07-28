@@ -1,21 +1,22 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-27T13:07:12.884Z",
+  "generatedAt": "2026-07-28T01:07:01.961Z",
   "summary": {
-    "frontierItems": 4,
+    "frontierItems": 5,
     "lessons": 7,
     "tracks": 6,
-    "latestFrontierDate": "2026-07-24",
+    "latestFrontierDate": "2026-07-27",
     "latestLessonDate": "2026-07-27"
   },
   "quality": {
-    "frontierScoreCoverage": "4/4",
+    "frontierScoreCoverage": "5/5",
     "deepLessonCoverage": "7/7",
     "researchArticleCoverage": "7/7",
     "syllabusCoverage": "6/6",
-    "directReferences": 26
+    "directReferences": 30
   },
   "categoryCoverage": {
+    "物理 AI": 1,
     "模型架构": 1,
     "模型经济性": 1,
     "训练基础设施": 1,
@@ -29,7 +30,7 @@
       "planned": 8,
       "readiness": "2/8",
       "latest": "2026-07-27",
-      "daysSinceLatest": 0
+      "daysSinceLatest": 1
     },
     {
       "id": "multimodal",
@@ -38,7 +39,7 @@
       "planned": 6,
       "readiness": "1/6",
       "latest": "2026-07-27",
-      "daysSinceLatest": 0
+      "daysSinceLatest": 1
     },
     {
       "id": "training",
@@ -47,7 +48,7 @@
       "planned": 9,
       "readiness": "1/9",
       "latest": "2026-07-27",
-      "daysSinceLatest": 0
+      "daysSinceLatest": 1
     },
     {
       "id": "inference",
@@ -56,7 +57,7 @@
       "planned": 8,
       "readiness": "1/8",
       "latest": "2026-07-27",
-      "daysSinceLatest": 0
+      "daysSinceLatest": 1
     },
     {
       "id": "agent",
@@ -65,7 +66,7 @@
       "planned": 8,
       "readiness": "1/8",
       "latest": "2026-07-27",
-      "daysSinceLatest": 0
+      "daysSinceLatest": 1
     },
     {
       "id": "evaluation",
@@ -74,10 +75,17 @@
       "planned": 7,
       "readiness": "1/7",
       "latest": "2026-07-27",
-      "daysSinceLatest": 0
+      "daysSinceLatest": 1
     }
   ],
   "recentFrontier": [
+    {
+      "slug": "nvidia-cosmos-h-dreams-surgical-world-model",
+      "title": "Cosmos-H-Dreams 将手术机器人世界模型推进到实时闭环",
+      "publishedAt": "2026-07-27",
+      "category": "物理 AI",
+      "evidenceLevel": "S"
+    },
     {
       "slug": "kimi-k3-open-frontier-intelligence",
       "title": "Kimi K3 将开放模型推进到 2.8T 参数与百万上下文",
