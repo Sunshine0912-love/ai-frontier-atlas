@@ -183,6 +183,45 @@
     ]
   },
   {
+    "slug": "causal-lm-objective-data-mixture",
+    "track": "training",
+    "order": 2,
+    "updatedAt": "2026-07-29",
+    "title": "预训练目标：因果语言建模与数据混合",
+    "description": "从 next-token loss、tokenization、packing、采样权重和数据治理出发，理解预训练质量为什么同时由目标函数和数据分布决定。",
+    "difficulty": "进阶",
+    "duration": "85 分钟",
+    "objectives": ["写出因果语言建模的 token 级交叉熵并解释 shift labels", "沿数据管线追踪文档、token、packing、mask 和 loss mask", "判断数据混合、去重和污染控制如何改变训练曲线与下游能力"],
+    "prerequisites": ["Transformer 自注意力", "交叉熵与最大似然", "基础数据处理与 tokenizer"],
+    "keyTerms": ["causal language modeling", "next-token loss", "packing", "data mixture", "deduplication", "contamination"],
+    "conceptMap": ["因果语言建模把一段 token 序列变成“用左侧上下文预测下一个 token”的最大似然问题。", "数据管线先决定哪些文档进入训练、以什么权重采样，再通过 tokenizer、packing 和 loss mask 变成固定长度样本。", "训练质量不只由 loss 下降决定；重复、低质、污染和混合权重会改变泛化能力、安全边界与评测可信度。"],
+    "mentalModel": "把预训练看成一台只会做下一词预测的巨大压缩机。目标函数告诉它每一步要预测什么，数据混合决定它每天看到哪些世界，packing 决定这些世界如何被切成训练样本。模型不是在抽象地学习“语言”，而是在给定 tokenizer、上下文窗口、采样权重和清洗规则下，拟合一个具体语料分布。",
+    "mechanism": ["输入 token 序列 x_1...x_L 经过 causal mask 后，模型在位置 t 输出对词表的 logits，用 x_{t+1} 作为监督标签。", "数据混合为每个语料源设置采样概率，训练迭代按 token 或样本预算抽取文档，去重、质量过滤和污染检测在进入索引前完成。", "packing 将多个文档拼接成固定长度样本；EOD、position reset、attention reset 和 loss mask 决定跨文档边界是否可见以及哪些 token 参与 loss。"],
+    "codePath": ["从 tokenizer 与文档过滤脚本确认 tokenization、去重和质量阈值。", "沿 dataset index、sample_index、shuffle_index 和 packing 逻辑定位固定长度训练样本如何生成。", "检查 data collator 或训练 step 中 labels 是否正确 shift、padding/EOD 是否被 loss mask 屏蔽，并按数据源记录 token 占比。"],
+    "tensorFlow": ["documents → filtered text → token ids [N_tokens] → packed samples [B,L+1]", "input_ids [B,L] → logits [B,L,V]；labels [B,L] = next tokens；loss_mask [B,L] → scalar loss"],
+    "pseudocode": ["documents = filter_and_deduplicate(raw_corpora)", "source = sample_source(mixture_weights)", "tokens = tokenizer(documents[source])", "sample = pack(tokens, length=L + 1, eod=eod_id)", "input_ids = sample[:-1]", "labels = sample[1:]", "logits = model(input_ids, causal_mask=True)", "loss = cross_entropy(logits, labels, mask=loss_mask)"],
+    "engineeringMeaning": ["预训练目标本身很简单，工程难点在于让数万亿 token 的来源、质量、顺序和边界可审计。", "数据混合权重是能力分配器：它会改变代码、数学、多语种、安全和长尾知识的学习预算，也会改变评测污染风险。"],
+    "decisionTable": [
+      { "condition": "通用基座模型、目标能力广", "choose": "多源混合 + 分阶段重加权", "because": "用大覆盖保证通用能力，再用高质量源提升推理、代码或多语种切片" },
+      { "condition": "训练 loss 很低但下游退化", "choose": "审计重复率、污染和低质高权重来源", "because": "模型可能在记忆重复模式，而不是获得更强泛化" },
+      { "condition": "固定 compute 预算下继续扩模", "choose": "同时规划参数量和训练 token 数", "because": "Chinchilla 结果提示过大模型配少量 token 会形成 undertraining" }
+    ],
+    "lab": {
+      "title": "构建一个可审计的最小 CLM 数据混合",
+      "steps": ["准备三类小语料：通用文本、代码片段和数学题，统计字符、token、重复率和来源标签。", "按两组 mixture weights 采样并 pack 成长度 128 的样本，记录每个 batch 的来源 token 占比和跨文档边界。", "实现 shift labels 与 loss mask，验证 padding/EOD 是否被正确屏蔽，并比较不同混合权重下的验证 loss。"],
+      "successCriteria": ["能打印 input_ids、labels、loss_mask 的逐位置对应关系。", "能解释一种混合权重提升某类验证集但损害另一类验证集的原因。"]
+    },
+    "selfCheck": ["为什么 CLM 的 labels 通常是 input_ids 左移或右移得到，而不是人工标注？", "packing 多个文档时，什么时候需要 reset attention 或屏蔽 EOD loss？", "数据去重为什么既影响训练效率，也影响 benchmark 可信度？", "Chinchilla 的结论为什么会改变参数量与 token 数的预算分配？"],
+    "sources": [
+      { "label": "Brown et al., Language Models are Few-Shot Learners", "url": "https://arxiv.org/abs/2005.14165", "type": "原始论文" },
+      { "label": "Hoffmann et al., Training Compute-Optimal Large Language Models", "url": "https://arxiv.org/abs/2203.15556", "type": "原始论文" },
+      { "label": "Gao et al., The Pile: An 800GB Dataset of Diverse Text for Language Modeling", "url": "https://arxiv.org/abs/2101.00027", "type": "原始论文" },
+      { "label": "Touvron et al., Llama 2: Open Foundation and Fine-Tuned Chat Models", "url": "https://arxiv.org/abs/2307.09288", "type": "技术报告" },
+      { "label": "NVIDIA Megatron Core GPTDataset 官方源码", "url": "https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/datasets/gpt_dataset.py", "type": "官方源码" },
+      { "label": "Hugging Face Transformers DataCollatorForLanguageModeling", "url": "https://github.com/huggingface/transformers/blob/main/src/transformers/data/data_collator.py", "type": "官方源码" }
+    ]
+  },
+  {
     "slug": "kv-cache-to-continuous-batching",
     "track": "inference",
     "order": 1,

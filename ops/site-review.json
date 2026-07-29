@@ -1,19 +1,19 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-29T01:09:23.829Z",
+  "generatedAt": "2026-07-29T13:08:40.865Z",
   "summary": {
     "frontierItems": 6,
-    "lessons": 8,
+    "lessons": 9,
     "tracks": 6,
     "latestFrontierDate": "2026-07-27",
-    "latestLessonDate": "2026-07-28"
+    "latestLessonDate": "2026-07-29"
   },
   "quality": {
     "frontierScoreCoverage": "6/6",
-    "deepLessonCoverage": "8/8",
-    "researchArticleCoverage": "8/8",
+    "deepLessonCoverage": "9/9",
+    "researchArticleCoverage": "9/9",
     "syllabusCoverage": "6/6",
-    "directReferences": 39
+    "directReferences": 45
   },
   "categoryCoverage": {
     "Agent 架构": 1,
@@ -45,11 +45,11 @@
     {
       "id": "training",
       "title": "训练与对齐",
-      "lessons": 1,
+      "lessons": 2,
       "planned": 9,
-      "readiness": "1/9",
-      "latest": "2026-07-27",
-      "daysSinceLatest": 2
+      "readiness": "2/9",
+      "latest": "2026-07-29",
+      "daysSinceLatest": 0
     },
     {
       "id": "inference",

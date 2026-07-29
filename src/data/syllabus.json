@@ -16,7 +16,7 @@
   {"track":"multimodal","order":6,"title":"多模态评测：感知、推理与幻觉","focus":"将感知错误、知识错误与语言先验偏差分开测量。","status":"planned"},
 
   {"track":"training","order":1,"title":"偏好对齐：从 RLHF 管线到 DPO 目标","focus":"统一理解奖励建模、KL 约束和直接偏好优化。","status":"available","slug":"preference-alignment-from-rlhf-to-dpo"},
-  {"track":"training","order":2,"title":"预训练目标：因果语言建模与数据混合","focus":"从 token 损失、采样权重与数据去重理解预训练目标。","status":"planned"},
+  {"track":"training","order":2,"title":"预训练目标：因果语言建模与数据混合","focus":"从 token 损失、采样权重与数据去重理解预训练目标。","status":"available","slug":"causal-lm-objective-data-mixture"},
   {"track":"training","order":3,"title":"优化器与学习率：稳定训练的控制面","focus":"解释 AdamW、warmup、梯度裁剪与训练稳定性的联系。","status":"planned"},
   {"track":"training","order":4,"title":"混合精度：FP16、BF16 与损失缩放","focus":"沿前向、反向和优化器状态分析精度与显存权衡。","status":"planned"},
   {"track":"training","order":5,"title":"数据并行：从 All-Reduce 到 ZeRO/FSDP","focus":"推导参数、梯度和优化器状态的分片与通信成本。","status":"planned"},

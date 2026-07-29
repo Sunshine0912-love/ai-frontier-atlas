@@ -559,5 +559,75 @@
     "implementationMap":[{"concept":"任务定义","code":"task config + dataset revision","note":"固定场景、prompt、few-shot 和样本来源。"},{"concept":"执行记录","code":"request/response/trace telemetry","note":"保存逐样本输出、token、延迟与错误。"},{"concept":"评分","code":"rules + execution + calibrated judges","note":"组合证据并保留评分器版本。"},{"concept":"统计","code":"slice aggregate + bootstrap CI","note":"报告配对差和最差切片。"},{"concept":"门禁","code":"predefined thresholds → pass/fail","note":"区分阻断项与观察项。"}],
     "limitations":["公开基准可能污染、过时或脱离产品分布。","LLM Judge 会引入位置、长度和风格偏差。","小样本切片的点估计波动大，必须报告不确定性。","评测设计仍包含场景选择和风险权重的价值判断。"],
     "takeaways":["先定义场景与失败成本，再选择数据和指标。","保存逐样本证据与完整配置，确保结果可复现。","用切片、置信区间和配对比较替代单一总分。","把关键指标写成预先定义的发布门禁和持续回归。"]
+  },
+  {
+    "slug": "causal-lm-objective-data-mixture",
+    "chapters": [
+      {
+        "id": "problem",
+        "title": "问题设定：预训练到底在优化什么",
+        "paragraphs": [
+          "大型语言模型预训练最常见的目标非常朴素：给定左侧上下文，预测下一个 token。GPT-3 论文把这种自回归语言模型扩展到 175B 参数，并展示了 few-shot 能力随规模增长而出现的强迁移现象。[1] 但工程上不能把“next-token prediction”理解成一句空泛口号。它具体依赖 tokenizer 怎样切分文本、训练样本怎样从长文档切出来、哪些位置参与 loss、不同来源语料以什么概率出现，以及评测集是否已经混入训练语料。",
+          "这节课要建立一个更贴近训练系统的视角：目标函数是简单的，数据分布不是简单的。模型看到的不是互联网本身，而是经过抓取、过滤、去重、分源采样、tokenization、packing 和 shuffle 后的一串 token。训练 loss 下降只说明模型更好地拟合了这个训练分布；它是否真正提升代码、数学、多语种、安全拒答或真实业务任务，取决于数据混合和验证集能否代表这些能力。"
+        ]
+      },
+      {
+        "id": "baseline",
+        "title": "基线：从最大似然到 next-token 交叉熵",
+        "paragraphs": [
+          "设训练序列为 x_1,x_2,...,x_L。因果语言模型把联合概率分解为每个位置条件概率的乘积：第 t 个预测只允许使用 x_1 到 x_t，不能看到未来 token。实现中通常给模型输入前 L 个 token，让 labels 对齐到后 L 个 token，再对每个位置做词表交叉熵。Hugging Face 的 `DataCollatorForLanguageModeling` 在 `mlm=False` 时会复制 `input_ids` 为 `labels`，并把 padding token 置为 -100；具体的 shift 常由 causal LM 模型内部完成。[6]",
+          "这和 masked language modeling 不同。MLM 只在被 mask 的位置计算 loss，并允许双向上下文；CLM 对每个未屏蔽位置预测下一个 token，配合 causal mask 形成生成模型。理解这个差异很重要，因为同一段文本可以构造出完全不同的训练信号。对自回归 LLM 来说，样本边界、EOD token、padding 和 loss mask 都会影响模型是否学习跨文档延续、是否在无意义 padding 上浪费梯度，以及是否把模板或噪声当成语言规律。"
+        ]
+      },
+      {
+        "id": "data",
+        "title": "数据混合：训练预算如何分配给不同世界",
+        "paragraphs": [
+          "数据混合不是把所有文本倒进一个桶。现代预训练通常把网页、书籍、论文、代码、问答、多语种文本和高质量人工数据分成不同来源，为每个来源设置采样权重。The Pile 明确把 800GB 语料组织为多个 component，使语言建模数据的构成可以被讨论和复查。[3] Llama 2 技术报告也把公开数据来源、过滤、去重和安全数据处理作为模型说明的一部分，而不只报告最终 benchmark。[4]",
+          "采样权重本质上是在分配学习预算。提高代码语料权重，模型更可能获得 API、语法和工程模式；提高数学与论文语料权重，推理和符号表达可能改善；增加低质网页或重复模板，则可能让 loss 快速下降但泛化退化。小光判断：训练路线里最容易被低估的是数据配方的产品属性。模型能力不是“自然涌现”在真空中，它经常是团队用 token 预算购买出来的能力结构。"
+        ]
+      },
+      {
+        "id": "pipeline",
+        "title": "管线：从文档到固定长度训练样本",
+        "paragraphs": [
+          "训练管线通常先把原始文档做语言识别、质量过滤、PII 或安全过滤、近重复去除和 benchmark 污染检查，再用 tokenizer 转为 token ids。随后系统根据文档长度和 sequence length 建立索引，把 token 流切成固定长度样本。NVIDIA Megatron Core 的 `GPTDataset` 包含 `document_index`、`sample_index`、`shuffle_index`，并提供 `add_extra_token_to_sequence` 选项，用额外 token 同时构造输入和输出序列。[5] 这类索引设计是大规模训练可复现和高吞吐的关键。",
+          "Packing 会把短文档拼进同一个 sequence，减少 padding 浪费，但它引入边界语义问题。若允许 attention 跨 EOD，模型会把两个无关文档当成连续上下文；若 reset position ids 或 attention mask，系统需要更复杂的 mask 和位置处理。是否屏蔽 EOD 的 loss 也不是纯技术细节：让模型预测 EOD 可以学习文档结束模式，但过多模板化边界可能影响训练信号。工程上应把这些选项写进训练卡，而不是只留下一个最终 checkpoint。"
+        ]
+      },
+      {
+        "id": "compute",
+        "title": "规模律：参数、token 与 compute 的三角关系",
+        "paragraphs": [
+          "GPT-3 时代的直觉往往是继续扩大参数。Chinchilla 论文系统研究了固定 compute 预算下模型大小和训练 token 数的配比，结论是许多大模型相对训练 token 数不足；在 compute-optimal 设置下，参数量和训练 token 数应大致一起增长。[2] 这改变了训练计划的核心问题：不是“能不能训更大模型”，而是“给定算力，参数和 token 如何配比才最有效”。",
+          "这个结论也会影响后续微调和推理成本。一个参数过大但训练 token 不足的模型，可能在预训练阶段没有充分吸收语料分布，却在推理阶段持续支付更高显存和延迟成本。反过来，更多 token 也不是无条件更好：如果新增 token 主要是重复、低质或污染数据，模型可能只是在更长时间里拟合同一噪声。规模律提供预算方向，数据治理决定这些 token 是否值得被模型看到。"
+        ]
+      },
+      {
+        "id": "example",
+        "title": "最小例子：一个 batch 如何产生 CLM loss",
+        "paragraphs": [
+          "考虑两个短文档：`A B C <eod>` 和 `D E <eod>`，token id 分别为 [10,11,12,2] 与 [20,21,2]。若 sequence length 为 4，packing 后可以构造一个长度 5 的样本 [10,11,12,2,20]，输入为 [10,11,12,2]，labels 为 [11,12,2,20]。如果允许跨文档学习，位置 4 会用 `<eod>` 预测 D；如果不允许，就需要在 EOD 后 reset attention 或把跨边界 label 位置的 loss mask 置 0。",
+          "这个玩具例子说明，CLM 的监督并不来自人工标签，而来自序列偏移。它也说明“数据处理”会直接改变数学目标：同一个 token 序列，因为边界 mask 不同，模型优化的条件概率集合就不同。在真实系统中，这个问题被放大到数万亿 token、数百个来源和多种模板。若没有逐源 token 统计、重复率、污染报告和 packing 配置，训练结果就很难被科学复查。"
+        ]
+      },
+      {
+        "id": "boundaries",
+        "title": "边界：loss 不是唯一目标",
+        "paragraphs": [
+          "预训练 loss 是必要仪表，但不是最终产品目标。更低 loss 可能来自更容易的重复数据、更短文本、更窄领域，或者 benchmark 泄漏。数据污染尤其危险：模型在公开基准上表现提升，可能只是训练时见过相同或近似样本。GPT-3 论文已经讨论了大规模网络语料带来的方法问题；后续开放数据集和模型卡则逐步把去重、来源和评测污染作为必须披露的训练事实。[1][3][4]",
+          "工程决策要把训练 loss、验证集分源 loss、下游任务、风险切片和成本放在一起看。数据混合是可以迭代的控制面：先用宽覆盖建立基础，再通过高质量、去重和任务相关来源提升目标能力；每次改动都要保存 dataset version、token count、source weights 和过滤规则。真正成熟的预训练系统不是只会吞更多 token，而是能解释每一类 token 为什么值得进入模型。"
+        ]
+      }
+    ],
+    "formulas": [
+      {"afterChapter":"baseline","label":"因果语言建模负对数似然","latex":"\\mathcal{L}_{CLM}=-\\frac{1}{\\sum_t m_t}\\sum_{t=1}^{L}m_t\\log p_\\theta(x_{t+1}\\mid x_{\\le t})","symbols":["x_t：第 t 个 token","m_t：loss mask，0 表示该位置不计入损失","p_\\theta：模型给出的下一个 token 概率","L：输入序列长度"],"intuition":"模型只用左侧上下文预测下一个 token；padding、跨文档边界或特殊位置可通过 mask 从平均 loss 中排除。"},
+      {"afterChapter":"data","label":"混合语料采样分布","latex":"P(d)=\\sum_{s\\in S}w_s\\,P(d\\mid s),\\quad \\sum_s w_s=1","symbols":["S：语料来源集合","w_s：来源 s 的采样权重","P(d|s)：在来源 s 内抽到文档 d 的概率"],"intuition":"训练分布由来源内文档分布和跨来源权重共同决定；改变权重就是改变模型看到世界的频率。"},
+      {"afterChapter":"compute","label":"近似训练计算量","latex":"C\\approx 6ND","symbols":["C：训练 FLOPs 预算","N：非 embedding 参数量","D：训练 token 数"],"intuition":"在 dense Transformer 近似下，参数量和 token 数共同消耗 compute；固定预算时过度偏向其中一边都会影响效率。"}
+    ],
+    "workedExample":{"title":"手算 packed CLM 样本的 labels 和 mask","steps":["把两个文档 token 化为 [10,11,12,2] 和 [20,21,2]，拼成长度 5 的训练窗口。","构造 input_ids=[10,11,12,2] 与 labels=[11,12,2,20]，标出 EOD 后跨文档预测位置。","分别设置跨文档可见和不可见两种 loss_mask，比较哪些条件概率被优化。"],"result":"同一批 token 可以产生不同训练目标；是否跨 EOD 学习必须由数据策略显式决定。"},
+    "implementationMap":[{"concept":"语料治理","code":"filter → deduplicate → contamination check","note":"记录来源、过滤版本、重复率和 benchmark 命中。"},{"concept":"采样混合","code":"mixture weights → source sampler","note":"按 token 而非文件数核对真实占比。"},{"concept":"样本索引","code":"document_index / sample_index / shuffle_index","note":"保证大规模训练可恢复、可打乱且避免重复偏差。"},{"concept":"CLM 标签","code":"input_ids[:-1] / labels[1:] / loss_mask","note":"检查 padding、EOD 和跨文档边界。"},{"concept":"训练监控","code":"per-source validation loss + downstream slices","note":"只看总体 loss 会掩盖来源退化。"}],
+    "limitations":["next-token loss 不直接等同于指令遵循、事实可靠或工具能力。","去重过弱会造成记忆和污染，去重过强也可能删除合法高频知识。","数据混合权重常包含经验判断，不能由论文公式唯一推出。","公开模型卡通常披露有限，无法完全复原商业模型的数据配方。"],
+    "takeaways":["CLM 的数学目标简单，但数据管线决定实际优化分布。","每个训练样本都应能追溯来源、tokenization、packing 和 loss mask。","数据混合权重是在分配能力预算，必须用分源验证集复查。","参数量、训练 token 和数据质量要一起规划，单独扩任一维都可能低效。"]
   }
 ]
