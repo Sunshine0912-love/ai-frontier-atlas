@@ -1,21 +1,22 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-28T13:06:59.961Z",
+  "generatedAt": "2026-07-29T01:09:23.829Z",
   "summary": {
-    "frontierItems": 5,
+    "frontierItems": 6,
     "lessons": 8,
     "tracks": 6,
     "latestFrontierDate": "2026-07-27",
     "latestLessonDate": "2026-07-28"
   },
   "quality": {
-    "frontierScoreCoverage": "5/5",
+    "frontierScoreCoverage": "6/6",
     "deepLessonCoverage": "8/8",
     "researchArticleCoverage": "8/8",
     "syllabusCoverage": "6/6",
-    "directReferences": 35
+    "directReferences": 39
   },
   "categoryCoverage": {
+    "Agent 架构": 1,
     "物理 AI": 1,
     "模型架构": 1,
     "模型经济性": 1,
@@ -30,7 +31,7 @@
       "planned": 8,
       "readiness": "2/8",
       "latest": "2026-07-27",
-      "daysSinceLatest": 1
+      "daysSinceLatest": 2
     },
     {
       "id": "multimodal",
@@ -39,7 +40,7 @@
       "planned": 6,
       "readiness": "2/6",
       "latest": "2026-07-28",
-      "daysSinceLatest": 0
+      "daysSinceLatest": 1
     },
     {
       "id": "training",
@@ -48,7 +49,7 @@
       "planned": 9,
       "readiness": "1/9",
       "latest": "2026-07-27",
-      "daysSinceLatest": 1
+      "daysSinceLatest": 2
     },
     {
       "id": "inference",
@@ -57,7 +58,7 @@
       "planned": 8,
       "readiness": "1/8",
       "latest": "2026-07-27",
-      "daysSinceLatest": 1
+      "daysSinceLatest": 2
     },
     {
       "id": "agent",
@@ -66,7 +67,7 @@
       "planned": 8,
       "readiness": "1/8",
       "latest": "2026-07-27",
-      "daysSinceLatest": 1
+      "daysSinceLatest": 2
     },
     {
       "id": "evaluation",
@@ -75,10 +76,17 @@
       "planned": 7,
       "readiness": "1/7",
       "latest": "2026-07-27",
-      "daysSinceLatest": 1
+      "daysSinceLatest": 2
     }
   ],
   "recentFrontier": [
+    {
+      "slug": "nvidia-nooa-object-oriented-agent-harness",
+      "title": "NOOA 把 Agent Harness 从提示工程提升为可测试软件接口",
+      "publishedAt": "2026-07-27",
+      "category": "Agent 架构",
+      "evidenceLevel": "S"
+    },
     {
       "slug": "nvidia-cosmos-h-dreams-surgical-world-model",
       "title": "Cosmos-H-Dreams 将手术机器人世界模型推进到实时闭环",

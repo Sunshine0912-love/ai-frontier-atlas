@@ -1,5 +1,29 @@
 [
   {
+    "slug": "nvidia-nooa-object-oriented-agent-harness",
+    "publishedAt": "2026-07-27",
+    "category": "Agent 架构",
+    "domain": "agent",
+    "stage": "研究预览 · 开源框架",
+    "organization": "NVIDIA",
+    "title": "NOOA 把 Agent Harness 从提示工程提升为可测试软件接口",
+    "summary": "NVIDIA-labs OO Agents 用 Python 对象统一状态、能力、提示、类型契约和 LLM 驱动循环，把 Agent 性能差异重新拉回 harness 架构、上下文管理和可验证执行。",
+    "fact": "NVIDIA 发布 NOOA 官方博客、arXiv 技术报告和 `NVIDIA-NeMo/labs-OO-Agents` 源码仓库，说明该框架把 agent 表示为 Python class：字段是状态，方法是能力，docstring 是提示，类型注解是契约，`...` 方法体由 LLM 运行时补全；官方材料同时报告 NOOA 在 SWE-bench Verified、CyberGym L1 和 ARC-AGI-3 等任务上的结果，并给出代码、评测组件和安全运行建议。",
+    "mechanism": "NOOA 的核心不是更换底座模型，而是改变模型与环境的交互面：typed I/O 限制输入输出语义，pass-by-reference 让大对象留在运行时并只向模型暴露有界预览，code-as-action 让模型通过 Python 控制流组合能力，显式对象状态和可调用 harness API 则把上下文、事件、记忆和验证路径变成可测试接口。",
+    "impact": "Agent 系统的优化对象从单轮 prompt 和工具 schema 扩展到可 diff、可单测、可 trace、可复现的 harness 软件结构。若报告中的 token 成本和 benchmark 增益能被外部复现，生产 Agent 的主要工程杠杆会更明确地转向状态接口、执行隔离、事件历史和过程级评测。",
+    "uncertainty": "性能数字来自发布方和作者报告，仍需第三方在相同模型、预算、任务版本和安全约束下复现；NOOA 允许 LLM 生成并执行 Python，README 明确说明 AST 检查和模块 deny-list 不是安全边界，真实部署仍依赖容器、VM 或 OpenShell 这类 OS 级隔离。",
+    "watchNext": "跟踪外部复现实验、SWE-bench / Terminal-Bench / ARC-AGI-3 配置细节、OpenShell 沙箱集成、memory subsystem 的消融结果，以及 typed object interface 在非代码类生产 Agent 上的失败模式。",
+    "evidenceLevel": "S",
+    "scores": { "novelty": 4, "impact": 4, "evidence": 4, "reproducibility": 4 },
+    "tags": ["Agent Harness", "Evaluation", "Open Source"],
+    "sources": [
+      { "label": "NVIDIA 官方技术博客", "url": "https://developer.nvidia.com/blog/six-agent-harness-capabilities-for-higher-model-performance/", "type": "官方技术博客", "direct": true },
+      { "label": "NVIDIA-labs OO Agents 技术报告", "url": "https://arxiv.org/abs/2607.20709", "type": "技术报告", "direct": true },
+      { "label": "NOOA 官方源码", "url": "https://github.com/NVIDIA-NeMo/labs-OO-Agents", "type": "官方源码", "direct": true },
+      { "label": "NVIDIA OpenShell 官方源码", "url": "https://github.com/NVIDIA/OpenShell", "type": "官方源码", "direct": true }
+    ]
+  },
+  {
     "slug": "nvidia-cosmos-h-dreams-surgical-world-model",
     "publishedAt": "2026-07-27",
     "category": "物理 AI",
