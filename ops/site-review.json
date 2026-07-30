@@ -1,19 +1,19 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-30T01:07:41.311Z",
+  "generatedAt": "2026-07-30T13:11:46.865Z",
   "summary": {
     "frontierItems": 7,
-    "lessons": 9,
+    "lessons": 10,
     "tracks": 6,
     "latestFrontierDate": "2026-07-29",
-    "latestLessonDate": "2026-07-29"
+    "latestLessonDate": "2026-07-30"
   },
   "quality": {
     "frontierScoreCoverage": "7/7",
-    "deepLessonCoverage": "9/9",
-    "researchArticleCoverage": "9/9",
+    "deepLessonCoverage": "10/10",
+    "researchArticleCoverage": "10/10",
     "syllabusCoverage": "6/6",
-    "directReferences": 50
+    "directReferences": 55
   },
   "categoryCoverage": {
     "Agent 评测": 1,
@@ -55,11 +55,11 @@
     {
       "id": "inference",
       "title": "推理与服务",
-      "lessons": 1,
+      "lessons": 2,
       "planned": 8,
-      "readiness": "1/8",
-      "latest": "2026-07-27",
-      "daysSinceLatest": 3
+      "readiness": "2/8",
+      "latest": "2026-07-30",
+      "daysSinceLatest": 0
     },
     {
       "id": "agent",

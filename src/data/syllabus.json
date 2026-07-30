@@ -26,7 +26,7 @@
   {"track":"training","order":9,"title":"训练诊断：损失尖峰、吞吐与故障恢复","focus":"建立从指标异常到数据、数值和基础设施根因的路径。","status":"planned"},
 
   {"track":"inference","order":1,"title":"从 KV Cache 到 Continuous Batching","focus":"统一解释缓存显存、调度、吞吐和延迟之间的关系。","status":"available","slug":"kv-cache-to-continuous-batching"},
-  {"track":"inference","order":2,"title":"推理性能模型：TTFT、TPOT 与吞吐","focus":"按 prefill、decode 和排队拆解请求端到端延迟。","status":"planned"},
+  {"track":"inference","order":2,"title":"推理性能模型：TTFT、TPOT 与吞吐","focus":"按 prefill、decode 和排队拆解请求端到端延迟。","status":"available","slug":"inference-performance-ttft-tpot-throughput"},
   {"track":"inference","order":3,"title":"FlashAttention：在线 Softmax 与 IO 复杂度","focus":"推导分块注意力如何减少 HBM 读写而保持精确结果。","status":"planned"},
   {"track":"inference","order":4,"title":"量化：权重、激活与 KV 的误差预算","focus":"比较 PTQ、QAT 与不同量化粒度的质量性能边界。","status":"planned"},
   {"track":"inference","order":5,"title":"投机解码：接受率与端到端加速","focus":"分析草稿模型成本、验证并行度和接受率的共同作用。","status":"planned"},

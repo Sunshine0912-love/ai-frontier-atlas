@@ -258,6 +258,133 @@
     ]
   },
   {
+    "slug": "inference-performance-ttft-tpot-throughput",
+    "track": "inference",
+    "order": 2,
+    "updatedAt": "2026-07-30",
+    "title": "推理性能模型：TTFT、TPOT 与吞吐",
+    "description": "按 prefill、decode、排队和 KV cache 拆解一次生成请求，建立能指导容量规划、SLO 和压测解释的推理性能模型。",
+    "difficulty": "进阶",
+    "duration": "85 分钟",
+    "objectives": [
+      "区分 TTFT、TPOT、ITL、端到端延迟、吞吐和 goodput 的不同含义",
+      "沿 prefill、decode、queue 和 KV cache 数据路径定位主要瓶颈",
+      "用请求长度分布、并发和 SLO 推导基本容量规划判断"
+    ],
+    "prerequisites": [
+      "Transformer 自注意力",
+      "KV Cache 与 Continuous Batching",
+      "基本排队论与百分位指标"
+    ],
+    "keyTerms": [
+      "TTFT",
+      "TPOT",
+      "prefill",
+      "decode",
+      "throughput",
+      "goodput",
+      "SLO"
+    ],
+    "conceptMap": [
+      "TTFT 主要由排队、输入处理、prefill 计算和首次调度决定，适合衡量交互启动速度。",
+      "TPOT/ITL 主要反映 decode 阶段每个新 token 的间隔，受 batch、KV 读取、采样和调度步影响。",
+      "吞吐必须和延迟 SLO 一起看；超过饱和点后，请求率继续上升通常先转化为队列时间和尾延迟。"
+    ],
+    "mentalModel": "把 LLM serving 看成两段式生产线：prefill 是一次性处理整段输入的装配工位，decode 是每轮只推进一个或少数 token 的节拍工位。用户先感受到 TTFT，随后感受到 token 流是否顺滑；平台侧看到的是队列长度、KV 使用率、GPU step 时间和成功完成的 token/请求。性能模型的任务不是追一个漂亮 QPS，而是解释在哪个负载点之后，新增流量会把延迟推过 SLO。",
+    "mechanism": [
+      "请求到达后先经历前端 tokenization、队列等待和首次调度；prefill 对输入 token 做并行计算并写入 KV cache，完成后产生首个输出 token。",
+      "decode 阶段在每个调度步读取历史 KV，计算下一个 token，执行采样并把新 K/V 追加到缓存；continuous batching 在步级别接纳和移除请求。",
+      "服务容量由 prefill token、decode token、KV cache blocks、调度 token budget、并发分布和 SLO 共同决定；瓶颈可能在计算、显存、队列或请求长度尾部。"
+    ],
+    "codePath": [
+      "从 benchmark client 记录 arrival、first_token、last_token、input/output tokens 和并发设置。",
+      "在 serving 引擎中查看 waiting/running 队列、scheduler step、prefill/decode 标记和 KV cache 使用率。",
+      "读取 vLLM metrics 中 request_queue_time、request_prefill_time、inter_token_latency、e2e_request_latency 与 token counters 的计算路径。"
+    ],
+    "tensorFlow": [
+      "prefill: input_ids [B,S_in] -> Q/K/V [B,H,S_in,D] -> logits [B,V]；写入 S_in 个位置的 KV",
+      "decode: last_token [B,1] -> Q [B,Hq,1,D]；读取 K/V [B,Hkv,S_total,D] -> next logits [B,V]",
+      "scheduler: waiting requests + token budget + KV blocks -> running batch -> per-step new tokens and metrics"
+    ],
+    "pseudocode": [
+      "arrival = now()",
+      "enqueue(request)",
+      "while request.active:",
+      "  batch = scheduler.select(waiting, running, token_budget, kv_blocks)",
+      "  if request.first_step: prefill(batch.prompt_tokens)",
+      "  else: decode_one_step(batch.last_tokens, kv_cache)",
+      "  record_new_token_time(batch)",
+      "ttft = first_token_time - arrival",
+      "tpot = (last_token_time - first_token_time) / max(output_tokens - 1, 1)"
+    ],
+    "engineeringMeaning": [
+      "TTFT、TPOT 和吞吐不能互相替代；一个系统可以高吞吐但启动慢，也可以首 token 快但长输出不稳定。",
+      "容量规划应报告到达率、输入/输出长度分布、P50/P95/P99 TTFT、TPOT、队列时间、KV 使用率和 SLO goodput。"
+    ],
+    "decisionTable": [
+      {
+        "condition": "交互聊天，用户等待首 token 敏感",
+        "choose": "限制 prefill token budget 并监控 P95 TTFT",
+        "because": "长 prompt prefill 会阻塞首 token，需控制大请求对短请求的影响"
+      },
+      {
+        "condition": "离线生成或批量总结，首 token 不重要",
+        "choose": "提高 batch 和并发以换吞吐",
+        "because": "可以接受更高单请求延迟，用更大批次摊薄 GPU 开销"
+      },
+      {
+        "condition": "长上下文与长输出混合，KV 接近满载",
+        "choose": "引入 prefix cache、分级队列或拒绝策略",
+        "because": "否则抢占和重算会放大 TTFT、TPOT 与尾延迟"
+      }
+    ],
+    "lab": {
+      "title": "压测一个最小推理服务并拆解指标",
+      "steps": [
+        "用固定输入长度和输出长度跑 3 组并发，记录 TTFT、TPOT、ITL、端到端延迟和 token throughput。",
+        "把输入长度加倍但保持输出长度不变，观察 TTFT、prefill 时间和 KV 使用率如何变化。",
+        "把输出长度加倍但保持输入长度不变，观察 TPOT、decode 时间、请求完成率和 SLO goodput 如何变化。"
+      ],
+      "successCriteria": [
+        "能指出每组实验的瓶颈更像 prefill、decode、KV 容量还是队列等待。",
+        "能画出请求率继续升高但 P95 延迟突然恶化的饱和点。"
+      ]
+    },
+    "selfCheck": [
+      "为什么 TTFT 不能用平均 decode token 延迟近似？",
+      "TPOT、ITL 和端到端延迟分别回答什么工程问题？",
+      "同样的 output token throughput 下，为什么两个服务的用户体验可能完全不同？",
+      "KV cache 使用率接近满载时，哪些指标会先变坏？"
+    ],
+    "sources": [
+      {
+        "label": "Kwon et al., Efficient Memory Management for LLM Serving with PagedAttention",
+        "url": "https://arxiv.org/abs/2309.06180",
+        "type": "原始论文"
+      },
+      {
+        "label": "Yu et al., Orca: A Distributed Serving System for Transformer-Based Generative Models",
+        "url": "https://www.usenix.org/conference/osdi22/presentation/yu",
+        "type": "原始论文"
+      },
+      {
+        "label": "vLLM Metrics 设计文档",
+        "url": "https://github.com/vllm-project/vllm/blob/main/docs/design/metrics.md",
+        "type": "官方设计文档"
+      },
+      {
+        "label": "vLLM Benchmark CLI 文档",
+        "url": "https://docs.vllm.ai/en/latest/benchmarking/cli.html",
+        "type": "官方文档"
+      },
+      {
+        "label": "vLLM v1 metrics 官方源码",
+        "url": "https://github.com/vllm-project/vllm/blob/main/vllm/v1/metrics/stats.py",
+        "type": "官方源码"
+      }
+    ]
+  },
+  {
     "slug": "agent-state-verification-recovery",
     "track": "agent",
     "order": 1,
