@@ -1,5 +1,30 @@
 [
   {
+    "slug": "openai-arc-agi-3-retained-reasoning-compaction",
+    "publishedAt": "2026-07-29",
+    "category": "Agent 评测",
+    "domain": "evaluation",
+    "stage": "官方复盘 · 待独立复现",
+    "organization": "OpenAI",
+    "title": "ARC-AGI-3 显示长程 Agent 评测已进入 Harness 敏感区",
+    "summary": "OpenAI 报告 GPT-5.6 Sol 在 ARC-AGI-3 上通过保留推理状态与启用 compaction，将公开任务集 RHAE 分数从官方 harness 的 13.3% 提升到 38.3%，同时输出 token 减少约 6 倍。",
+    "fact": "OpenAI 在官方文章中复盘 ARC-AGI-3 评测：GPT-5.6 Sol 使用官方通用 harness 时公开集 RHAE 为 13.3%，使用 Responses API harness 并开启 retained reasoning 与 compaction 后为 38.3%；文章同时说明该 benchmark 的动作反馈只返回每帧文本表示和关卡信息，模型看不到实时得分。ARC-AGI-3 官方文档定义 RHAE 为相对人类动作效率，动作会影响环境状态，推理步骤和工具调用本身不计入动作。",
+    "mechanism": "官方 harness 在每次动作后丢弃私有推理，并用 rolling truncation 在上下文超限时移除旧消息，使模型既忘记先前计划，也逐步丢失早期动作历史。OpenAI 的 Responses API 保留模型的 reasoning state，并用 compaction 在长对话中摘要保留关键历史；这让模型不必每回合重新理解游戏，能跨动作积累策略，同时减少重复输出。",
+    "impact": "长程 Agent 评测不能再被看作“模型能力分数”的直接读数，harness 的状态保留、上下文压缩、动作日志和提示策略会显著改变结果。对生产系统来说，核心评测对象应从最终答案扩展到状态管理、记忆压缩、任务轨迹和单位成功动作/ token 成本；对公开榜单来说，同一模型在不同 harness 下的可比性需要单独审计。",
+    "uncertainty": "主要分数来自 OpenAI 自测和官方复盘，尚未看到第三方在相同 public set、相同模型版本、相同 Responses API 设置和相同 token/动作预算下复现。文章证明 harness 选择会影响分数，但不能单独证明 GPT-5.6 Sol 在隐藏集或其他长程任务上同幅度提升，也不能排除针对该 benchmark 调参带来的外推风险。",
+    "watchNext": "跟踪 ARC Prize 是否接纳或标注 retained reasoning / compaction 类 harness，第三方能否公开复现 13.3%→38.3% 的差异，隐藏集表现是否同步改善，以及其他 CUA、SWE、Terminal 和浏览器 Agent 基准是否也需要报告 reasoning retention、compaction、rolling truncation 和上下文预算。",
+    "evidenceLevel": "S",
+    "scores": { "novelty": 4, "impact": 4, "evidence": 3, "reproducibility": 2 },
+    "tags": ["Agent Evaluation", "Harness", "Context Management"],
+    "sources": [
+      { "label": "OpenAI 官方 ARC-AGI-3 复盘", "url": "https://openai.com/index/how-two-settings-tripled-our-arc-agi-3-scores/", "type": "官方研究文章", "direct": true },
+      { "label": "OpenAI Responses API 设计说明", "url": "https://developers.openai.com/blog/responses-api", "type": "官方技术博客", "direct": true },
+      { "label": "OpenAI Compaction 官方文档", "url": "https://developers.openai.com/api/docs/guides/compaction", "type": "官方文档", "direct": true },
+      { "label": "ARC-AGI-3 评分方法", "url": "https://docs.arcprize.org/methodology", "type": "基准官方文档", "direct": true },
+      { "label": "ARC-AGI-3 public demo human logs", "url": "https://huggingface.co/datasets/magic-sword/arc_agi_3_public_demo_human_testing", "type": "基准数据集", "direct": true }
+    ]
+  },
+  {
     "slug": "nvidia-nooa-object-oriented-agent-harness",
     "publishedAt": "2026-07-27",
     "category": "Agent 架构",

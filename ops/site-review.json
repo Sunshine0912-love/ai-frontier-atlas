@@ -1,21 +1,22 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-29T13:08:40.865Z",
+  "generatedAt": "2026-07-30T01:07:41.311Z",
   "summary": {
-    "frontierItems": 6,
+    "frontierItems": 7,
     "lessons": 9,
     "tracks": 6,
-    "latestFrontierDate": "2026-07-27",
+    "latestFrontierDate": "2026-07-29",
     "latestLessonDate": "2026-07-29"
   },
   "quality": {
-    "frontierScoreCoverage": "6/6",
+    "frontierScoreCoverage": "7/7",
     "deepLessonCoverage": "9/9",
     "researchArticleCoverage": "9/9",
     "syllabusCoverage": "6/6",
-    "directReferences": 45
+    "directReferences": 50
   },
   "categoryCoverage": {
+    "Agent 评测": 1,
     "Agent 架构": 1,
     "物理 AI": 1,
     "模型架构": 1,
@@ -31,7 +32,7 @@
       "planned": 8,
       "readiness": "2/8",
       "latest": "2026-07-27",
-      "daysSinceLatest": 2
+      "daysSinceLatest": 3
     },
     {
       "id": "multimodal",
@@ -40,7 +41,7 @@
       "planned": 6,
       "readiness": "2/6",
       "latest": "2026-07-28",
-      "daysSinceLatest": 1
+      "daysSinceLatest": 2
     },
     {
       "id": "training",
@@ -49,7 +50,7 @@
       "planned": 9,
       "readiness": "2/9",
       "latest": "2026-07-29",
-      "daysSinceLatest": 0
+      "daysSinceLatest": 1
     },
     {
       "id": "inference",
@@ -58,7 +59,7 @@
       "planned": 8,
       "readiness": "1/8",
       "latest": "2026-07-27",
-      "daysSinceLatest": 2
+      "daysSinceLatest": 3
     },
     {
       "id": "agent",
@@ -67,7 +68,7 @@
       "planned": 8,
       "readiness": "1/8",
       "latest": "2026-07-27",
-      "daysSinceLatest": 2
+      "daysSinceLatest": 3
     },
     {
       "id": "evaluation",
@@ -76,10 +77,17 @@
       "planned": 7,
       "readiness": "1/7",
       "latest": "2026-07-27",
-      "daysSinceLatest": 2
+      "daysSinceLatest": 3
     }
   ],
   "recentFrontier": [
+    {
+      "slug": "openai-arc-agi-3-retained-reasoning-compaction",
+      "title": "ARC-AGI-3 显示长程 Agent 评测已进入 Harness 敏感区",
+      "publishedAt": "2026-07-29",
+      "category": "Agent 评测",
+      "evidenceLevel": "S"
+    },
     {
       "slug": "nvidia-nooa-object-oriented-agent-harness",
       "title": "NOOA 把 Agent Harness 从提示工程提升为可测试软件接口",
